@@ -1,21 +1,26 @@
 <?php
-if(($_POST['k']??'')!=='detail1'){http_response_code(403);exit('forbidden');}
+if(($_POST['k']??'')!=='detail2'){http_response_code(403);exit('forbidden');}
 $f=dirname(__DIR__).'/index.html';
 $html=file_get_contents($f);
-if(strpos($html,'card-detail-v1')!==false){echo 'already done';exit;}
+if(strpos($html,'card-detail-v2')!==false){echo 'already done';exit;}
+// Remove old detail v1 if present
+$html=preg_replace('/<style id="card-detail-v1-css">.*?<\/style>/s','',$html);
+$html=preg_replace('/<script id="card-detail-v1-js">.*?<\/script>/s','',$html);
+// Remove old v1 marker
+$html=str_replace('<!-- card-detail-v1 -->','',$html);
 $old1=<<<'FIND'
 html+='<div class="dp-card">';
 FIND;
 $new1=<<<'REPL'
-html+='<div class="dp-card" data-cid="'+(i.contentid||'')+'">'; /* card-detail-v1 */
+html+='<div class="dp-card" data-cid="'+(i.contentid||'')+'">'; /* card-detail-v2 */
 REPL;
 $html=str_replace($old1,$new1,$html);
 $inject=<<<'END'
-<style id="card-detail-v1-css">
+<style id="card-detail-v2-css">
 #cd-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:10500;align-items:center;justify-content:center;padding:20px;}
 #cd-box{background:#fff;border-radius:18px;width:100%;max-width:560px;overflow:hidden;box-shadow:0 16px 56px rgba(0,0,0,0.3);animation:cdSlide .2s ease;}
 @keyframes cdSlide{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
-#cd-img{width:100%;height:200px;object-fit:cover;display:block;background:#f0ede8;}
+#cd-img{width:100%;height:200px;object-fit:cover;display:block;}
 #cd-img-ph{width:100%;height:180px;display:flex;align-items:center;justify-content:center;font-size:40px;background:linear-gradient(135deg,#e8e0d0,#f5f0e8);}
 #cd-body{padding:20px 22px 24px;}
 #cd-name{font-size:17px;font-weight:700;color:#1a1a1a;margin:0 0 6px;}
@@ -26,7 +31,7 @@ $inject=<<<'END'
 .dp-card{cursor:pointer;}
 .dp-card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,0.12);}
 </style>
-<script id="card-detail-v1-js">
+<script id="card-detail-v2-js">
 document.addEventListener('DOMContentLoaded',function(){
   var cdOverlay=document.createElement('div');cdOverlay.id='cd-overlay';
   cdOverlay.innerHTML='<div id="cd-box"><div id="cd-img-wrap"></div><div id="cd-body"><p id="cd-name"></p><p id="cd-addr"></p><p id="cd-text"></p><button id="cd-close">Close</button></div></div>';
@@ -46,20 +51,17 @@ document.addEventListener('DOMContentLoaded',function(){
     document.getElementById('cd-text').textContent='Loading...';
     var wrap=document.getElementById('cd-img-wrap');
     if(imgEl&&imgEl.src){
-      var im=document.createElement('img');
-      im.id='cd-img';im.src=imgEl.src;im.alt='';
+      var im=document.createElement('img');im.id='cd-img';im.src=imgEl.src;im.alt='';
       im.onerror=function(){wrap.innerHTML='<div id="cd-img-ph">&#x1F1F0;&#x1F1F7;</div>';};
       wrap.innerHTML='';wrap.appendChild(im);
-    } else {
-      wrap.innerHTML='<div id="cd-img-ph">&#x1F1F0;&#x1F1F7;</div>';
-    }
+    } else {wrap.innerHTML='<div id="cd-img-ph">&#x1F1F0;&#x1F1F7;</div>';}
     cdOverlay.style.display='flex';
-    fetch('/api/detail.php?contentId='+encodeURIComponent(cid))
+    fetch('/api/get_detail.php?contentId='+encodeURIComponent(cid))
       .then(function(r){return r.json();})
       .then(function(d){
-        var item=(d.response&&d.response.body&&d.response.body.items&&d.response.body.items.item)||{};
-        if(Array.isArray(item))item=item[0]||{};
-        var ov=(item.overview||'').replace(/<[^>]*>/g,'').trim();
+        var items=(d.response&&d.response.body&&d.response.body.items&&d.response.body.items.item)||{};
+        var item=Array.isArray(items)?items[0]:items;
+        var ov=((item&&item.overview)||'').replace(/<[^>]*>/g,'').trim();
         if(ov.length>300)ov=ov.slice(0,300)+'...';
         document.getElementById('cd-text').textContent=ov||'No description available.';
       })
@@ -70,4 +72,4 @@ document.addEventListener('DOMContentLoaded',function(){
 END;
 $html=str_replace('</head>',$inject.'</head>',$html);
 file_put_contents($f,$html);
-echo 'card-detail-v1 done';
+echo 'card-detail-v2 done';
