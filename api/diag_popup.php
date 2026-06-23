@@ -2,10 +2,16 @@
 if(($_POST['k']??'')!=='diag1'){http_response_code(403);exit('forbidden');}
 $f=dirname(__DIR__).'/index.html';
 $html=file_get_contents($f);
-// Find the popup rendering section by looking for the key marker
-$pos=strpos($html,'dp-loading');
-if($pos===false){echo 'dp-loading not found';exit;}
-// Get 3000 chars around it
-$start=max(0,$pos-200);
-$chunk=substr($html,$start,3000);
-echo base64_encode($chunk);
+// Search for multiple markers to find popup code
+$markers=['popup-cat-v1','popup-cat-v2','cat_search','openDetail','dp-grid','dp-overlay','kw||name','keyword||name'];
+$out='';
+foreach($markers as $m){
+  $p=strpos($html,$m);
+  if($p!==false){
+    $chunk=substr($html,max(0,$p-100),400);
+    $out.="=== FOUND: $m ===\n".base64_encode($chunk)."\n\n";
+  } else {
+    $out.="=== NOT FOUND: $m ===\n\n";
+  }
+}
+echo $out;
