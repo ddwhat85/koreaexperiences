@@ -8,6 +8,6 @@ $url='https://apis.data.go.kr/B551011/EngService2/detailCommon2'
     .'?serviceKey='.urlencode(TOUR_API_KEY)
     .'&MobileOS=ETC&MobileApp=KoreaExp&_type=json'
     .'&contentId='.$id
-    .'&defaultYN=Y&overviewYN=Y';
+    .'&overviewYN=Y';
 $r=@file_get_contents($url,false,stream_context_create(['http'=>['timeout'=>10]]));
 echo $r!==false?$r:'{}';
