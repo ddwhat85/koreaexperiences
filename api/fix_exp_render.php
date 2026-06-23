@@ -4,13 +4,13 @@ $f=dirname(__DIR__).'/index.html';
 $html=file_get_contents($f);
 if(strpos($html,'exp-render-v1')!==false){echo 'already done';exit;}
 $old=<<<'FIND'
-body.innerHTML='<div class="dp-loading">Loading experiences...<\/div>';
+body.innerHTML='<div class="dp-loading">Loading experiences...</div>';
 fetch('/api/cat_search.php?cat='+encodeURIComponent(name)) /* popup-cat-v2 */
 .then(function(r){return r.json();})
 .then(function(d){
 var items=(d.response&&d.response.body&&d.response.body.items&&d.response.body.items.item)||[];
 if(!Array.isArray(items))items=items?[items]:[];
-var SKIP=['mart','shop','store','outlet','tax refund','branch','franchise','í¸ìì ','ì§ì ','ë©´ì¸'];
+var SKIP=['mart','shop','store','outlet','tax refund','branch','franchise','í¸ìì ','ì§ì ','ë©´ì¸','hospital','clinic','medical','hotel','hostel','pension','guesthouse','motel']; /* popup-filter-v1 */
 items=items.filter(function(i){var t=(i.title||"").toLowerCase();return !SKIP.some(function(s){return t.indexOf(s)>=0;});});
 if(!items.length){body.innerHTML='<div class="dp-empty">No results found.<\/div>';return;}
 var html='<div class="dp-grid">';
