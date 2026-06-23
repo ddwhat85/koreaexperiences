@@ -3,8 +3,12 @@ if(($_POST['k']??'')!=='detail1'){http_response_code(403);exit('forbidden');}
 $f=dirname(__DIR__).'/index.html';
 $html=file_get_contents($f);
 if(strpos($html,'card-detail-v1')!==false){echo 'already done';exit;}
-$old1='html+='<div class="dp-card">';';
-$new1='html+='<div class="dp-card" data-cid="'+(i.contentid||'')+'">'; /* card-detail-v1 */';
+$old1=<<<'FIND'
+html+='<div class="dp-card">';
+FIND;
+$new1=<<<'REPL'
+html+='<div class="dp-card" data-cid="'+(i.contentid||'')+'">'; /* card-detail-v1 */
+REPL;
 $html=str_replace($old1,$new1,$html);
 $inject=<<<'END'
 <style id="card-detail-v1-css">
@@ -20,7 +24,7 @@ $inject=<<<'END'
 #cd-close{width:100%;padding:12px;background:#f5f5f5;color:#666;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;}
 #cd-close:hover{background:#eee;}
 .dp-card{cursor:pointer;}
-.dp-card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,0.13);}
+.dp-card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,0.12);}
 </style>
 <script id="card-detail-v1-js">
 document.addEventListener('DOMContentLoaded',function(){
@@ -32,20 +36,22 @@ document.addEventListener('DOMContentLoaded',function(){
   document.addEventListener('click',function(e){
     var card=e.target.closest('.dp-card');
     if(!card)return;
-    var cid=card.dataset.cid;
+    var cid=card.getAttribute('data-cid');
     if(!cid)return;
-    var name=card.querySelector('.dp-name')?card.querySelector('.dp-name').textContent:'';
-    var addr=card.querySelector('.dp-addr')?card.querySelector('.dp-addr').textContent:'';
+    var name=(card.querySelector('.dp-name')||{textContent:''}).textContent;
+    var addr=(card.querySelector('.dp-addr')||{textContent:''}).textContent;
     var imgEl=card.querySelector('.dp-thumb');
-    var imgSrc=imgEl?imgEl.src:'';
     document.getElementById('cd-name').textContent=name;
     document.getElementById('cd-addr').textContent=addr;
     document.getElementById('cd-text').textContent='Loading...';
     var wrap=document.getElementById('cd-img-wrap');
-    if(imgSrc&&imgSrc.indexOf('koreaexperiences')<0){
-      wrap.innerHTML='<img id="cd-img" src="'+imgSrc+'" alt="" onerror="this.parentNode.innerHTML='<div id=cd-img-ph>\uD83C\uDDF0\uD83C\uDDF7</div>'">';
+    if(imgEl&&imgEl.src){
+      var im=document.createElement('img');
+      im.id='cd-img';im.src=imgEl.src;im.alt='';
+      im.onerror=function(){wrap.innerHTML='<div id="cd-img-ph">&#x1F1F0;&#x1F1F7;</div>';};
+      wrap.innerHTML='';wrap.appendChild(im);
     } else {
-      wrap.innerHTML='<div id="cd-img-ph">\uD83C\uDDF0\uD83C\uDDF7</div>';
+      wrap.innerHTML='<div id="cd-img-ph">&#x1F1F0;&#x1F1F7;</div>';
     }
     cdOverlay.style.display='flex';
     fetch('/api/detail.php?contentId='+encodeURIComponent(cid))
@@ -53,8 +59,7 @@ document.addEventListener('DOMContentLoaded',function(){
       .then(function(d){
         var item=(d.response&&d.response.body&&d.response.body.items&&d.response.body.items.item)||{};
         if(Array.isArray(item))item=item[0]||{};
-        var ov=item.overview||'';
-        ov=ov.replace(/<[^>]*>/g,'').trim();
+        var ov=(item.overview||'').replace(/<[^>]*>/g,'').trim();
         if(ov.length>300)ov=ov.slice(0,300)+'...';
         document.getElementById('cd-text').textContent=ov||'No description available.';
       })
