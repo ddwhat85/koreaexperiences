@@ -2,11 +2,10 @@
 analyzer/product_analyzer.py
 TrafficAI Engine 1.0 — Product Analyzer
 
-5개 소스 스토어에서 상품 데이터 수집 → PublishPacket 변환 준비
-소스: sapporofactory, portablejapan, dunkjapan, geminijapan, 5makase.com
+4개 소스 스토어에서 상품 데이터 수집 → PublishPacket 변환 준비
+소스: sapporofactory, portablejapan, dunkjapan, geminijapan
 
 Naver Smartstore: 상품 목록 페이지 파싱 (requests + BeautifulSoup)
-5makase.com: RSS / 상품 목록 페이지 파싱
 """
 
 from __future__ import annotations
@@ -62,12 +61,6 @@ SOURCE_STORES = {
         "name": "제미니재팬직구",
         "url": "https://smartstore.naver.com/geminijapan",
         "type": "naver",
-        "city": "일본",
-    },
-    "5makase": {
-        "name": "5마카세",
-        "url": "https://www.5makase.com",
-        "type": "makase",
         "city": "일본",
     },
 }
@@ -472,130 +465,12 @@ class NaverSmartStoreScraper(BaseStoreScraper):
 
 
 # ---------------------------------------------------------------------------
-# 5makase.com 스크레이퍼
-# ---------------------------------------------------------------------------
-
-class MakaseScraper(BaseStoreScraper):
-    """
-    https://www.5makase.com/ 상품 파싱.
-    일본 큐레이션 상품 사이트. 카테고리별 HTML 파싱 사용.
-    """
-
-    CATEGORY_PATHS = [
-        "/category/드럭스토어",
-        "/category/food",
-        "/category/beauty",
-        "/category/daily",
-        "",    # 메인 (최신 상품)
-    ]
-
-    def fetch_products(self, limit: int = 20) -> list:
-        all_products = []
-
-        for path in self.CATEGORY_PATHS:
-            if len(all_products) >= limit:
-                break
-            url  = self.base_url + path
-            soup = self.client.get(url)
-            if not soup:
-                continue
-
-            batch = self._parse_page(soup)
-            existing_ids = {p.product_id for p in all_products}
-            for p in batch:
-                if p.product_id not in existing_ids:
-                    all_products.append(p)
-                    existing_ids.add(p.product_id)
-
-        logger.info(f"[5makase] {len(all_products)}개 수집")
-        return all_products[:limit]
-
-    def _parse_page(self, soup: BeautifulSoup) -> list:
-        products = []
-
-        card_selectors = [
-            "article.product",
-            "div.product-card",
-            "li.product",
-            "div[class*='product']",
-            "article",
-        ]
-
-        cards = []
-        for sel in card_selectors:
-            cards = soup.select(sel)
-            if len(cards) >= 2:
-                break
-
-        for card in cards:
-            try:
-                name_el = card.select_one("h2, h3, h4, .product-title, .name, [class*='title']")
-                name = name_el.get_text(strip=True) if name_el else ""
-                if not name or len(name) < 3:
-                    continue
-
-                img_el = card.select_one("img")
-                img_url = ""
-                if img_el:
-                    img_url = (
-                        img_el.get("data-src")
-                        or img_el.get("src")
-                        or ""
-                    )
-                    if img_url and not img_url.startswith("http"):
-                        img_url = urljoin(self.base_url, img_url)
-
-                a_el = card.select_one("a[href]")
-                href = a_el.get("href", "") if a_el else ""
-                if href and not href.startswith("http"):
-                    href = urljoin(self.base_url, href)
-
-                price_el = card.select_one("[class*='price'], .cost, .amount")
-                price_text = price_el.get_text(strip=True) if price_el else "0"
-                price = int(re.sub(r"\D", "", price_text) or 0)
-
-                category = self._guess_category(name, href)
-                raw_pid = href.split("/")[-1] or name[:12]
-
-                products.append(ProductData(
-                    product_id   = self._make_product_id(raw_pid),
-                    store_key    = self.store_key,
-                    store_name   = self.store_name,
-                    product_name = name,
-                    price        = price,
-                    original_price = price,
-                    image_url    = img_url,
-                    product_url  = href or self.base_url,
-                    category     = category,
-                    city         = "일본",
-                    review_score = 75.0,
-                ))
-            except Exception as e:
-                logger.debug(f"[5MAKASE CARD] {e}")
-
-        return products
-
-    @staticmethod
-    def _guess_category(name: str, url: str) -> str:
-        text = (name + " " + url).lower()
-        if any(k in text for k in ("마스크", "클렌", "선크림", "스킨", "로션", "세럼", "크림", "뷰티")):
-            return "뷰티/스킨케어"
-        if any(k in text for k in ("비타민", "약", "드럭", "의약", "supplement")):
-            return "드럭스토어"
-        if any(k in text for k in ("과자", "초콜릿", "구미", "스낵", "食品", "food", "식품", "음료")):
-            return "식품/간식"
-        if any(k in text for k in ("샴푸", "컨디셔너", "헤어", "hair")):
-            return "헤어케어"
-        return "일반상품"
-
-
-# ---------------------------------------------------------------------------
 # 오케스트레이터
 # ---------------------------------------------------------------------------
 
 class ProductAnalyzer:
     """
-    5개 소스 스토어에서 상품 데이터를 수집하고 점수화.
+    4개 소스 스토어에서 상품 데이터를 수집하고 점수화.
 
     환경변수:
         NAVER_CLIENT_ID     : Naver 오픈 API 클라이언트 ID (선택)
@@ -617,8 +492,6 @@ class ProductAnalyzer:
         for key, meta in SOURCE_STORES.items():
             if meta["type"] == "naver":
                 scrapers[key] = NaverSmartStoreScraper(key, self._client)
-            elif meta["type"] == "makase":
-                scrapers[key] = MakaseScraper(key, self._client)
         return scrapers
 
     def fetch_all(self, per_store: int = 20) -> list:
