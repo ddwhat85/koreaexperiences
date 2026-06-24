@@ -245,7 +245,7 @@ class NaverSmartStoreScraper(BaseStoreScraper):
             return []
 
         params = {
-            "query":   self.store_name,
+            "query":   self.store_key,   # 영문 스토어 ID로 검색 (예: sapporofactory)
             "display": min(limit, 100),
             "sort":    "date",           # 최신순
         }
@@ -262,6 +262,7 @@ class NaverSmartStoreScraper(BaseStoreScraper):
             )
             resp.raise_for_status()
             items = resp.json().get("items", [])
+            logger.info(f"[NAVER API] {self.store_key}: 원본 {len(items)}개 수신")
         except Exception as e:
             logger.warning(f"[NAVER API] {self.store_key}: {e}")
             return []
@@ -269,7 +270,7 @@ class NaverSmartStoreScraper(BaseStoreScraper):
         products = []
         for item in items:
             mall = item.get("mallName", "")
-            if self.store_name not in mall and self.store_key not in item.get("link", "").lower():
+            if self.store_key not in item.get("link", "").lower() and self.store_name not in mall:
                 continue
 
             price   = int(re.sub(r"\D", "", item.get("lprice", "0")) or 0)
