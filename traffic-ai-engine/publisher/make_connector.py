@@ -51,7 +51,7 @@ class PublishPacket:
             "store_name":         self.store_name,
             "product_name":       self.product_name,
             "image_url":          self.image_url,
-            "product_url":        self.product_url,
+
             "content":            self.content,
             "target_time":        self.target_time,
             "faq_data":           [asdict(f) for f in self.faq_data],
