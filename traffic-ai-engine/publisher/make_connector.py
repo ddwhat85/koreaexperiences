@@ -19,7 +19,7 @@ from urllib3.util.retry import Retry
 
 logger = logging.getLogger(__name__)
 
-PUBLISH_SLOTS = ["08:10", "12:05", "18:20", "22:10"]
+PUBLISH_SLOTS = ["08:10", "12:05", "15:05", "18:20", "22:10"]
 
 
 @dataclass
