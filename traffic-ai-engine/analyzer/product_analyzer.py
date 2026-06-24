@@ -168,6 +168,34 @@ class FetchClient:
         logger.error(f"[GIVE UP] {url} after {self.max_retries} retries")
         return None
 
+    def fetch_og_image(self, url: str) -> str:
+        """
+        상품 페이지에서 og:image 메타태그를 읽어 실제 대표 이미지 URL을 반환.
+        실패 시 빈 문자열 반환.
+        """
+        if not url:
+            return ""
+        try:
+            resp = self._session.get(
+                url,
+                headers=self._headers(),
+                timeout=self.timeout,
+                allow_redirects=True,
+            )
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, "html.parser")
+            # 1순위: og:image
+            og = soup.find("meta", property="og:image")
+            if og and og.get("content"):
+                return og["content"].strip()
+            # 2순위: twitter:image
+            tw = soup.find("meta", attrs={"name": "twitter:image"})
+            if tw and tw.get("content"):
+                return tw["content"].strip()
+        except Exception as e:
+            logger.debug(f"[OG:IMAGE] {url}: {e}")
+        return ""
+
 
 # ---------------------------------------------------------------------------
 # 기본 스크레이퍼
@@ -573,7 +601,7 @@ class ProductAnalyzer:
         NAVER_CLIENT_ID     : Naver 오픈 API 클라이언트 ID (선택)
         NAVER_CLIENT_SECRET : Naver 오픈 API 시크릿 (선택)
         PA_MIN_SCORE        : 최소 리뷰 점수 필터 (기본 60.0)
-        PA_MIN_PRICE        : 최소 가격 필터 KRW (기본 8)
+        PA_MIN_PRICE        : 최소 가격 필터 KRW (기본 0)
         PA_MAX_PRICE        : 최대 가격 필터 KRW (기본 500000)
     """
 
@@ -605,13 +633,38 @@ class ProductAnalyzer:
             except Exception as e:
                 logger.error(f"[ANALYZER] {key} 오류: {e}")
         logger.info(f"[ANALYZER] 총 {len(all_products)}개 수집")
+        self._enrich_images(all_products)
         return all_products
 
     def fetch_store(self, store_key: str, limit: int = 20) -> list:
         """특정 스토어만 수집"""
         if store_key not in self._scrapers:
             raise ValueError(f"알 수 없는 스토어: {store_key}. 가능: {list(self._scrapers)}")
-        return self._scrapers[store_key].fetch_products(limit)
+        products = self._scrapers[store_key].fetch_products(limit)
+        self._enrich_images(products)
+        return products
+
+    def _enrich_images(self, products: list) -> None:
+        """
+        image_url이 비어 있거나 신뢰할 수 없는 도메인인 경우
+        상품 페이지의 og:image 메타태그로 교체.
+        신뢰 도메인: naver.com, pstatic.net, smartstore.naver.com, 5makase.com
+        """
+        TRUSTED = ("naver.com", "pstatic.net", "5makase.com", "kakaocdn.net")
+
+        for p in products:
+            needs_refresh = (
+                not p.image_url
+                or not any(t in p.image_url for t in TRUSTED)
+            )
+            if needs_refresh and p.product_url:
+                logger.debug(f"[OG:IMAGE] {p.product_name[:30]} → og:image 조회 중")
+                og_url = self._client.fetch_og_image(p.product_url)
+                if og_url:
+                    logger.info(f"[OG:IMAGE] ✓ {p.product_name[:30]}")
+                    p.image_url = og_url
+                else:
+                    logger.warning(f"[OG:IMAGE] ✗ {p.product_name[:30]} — og:image 없음")
 
     def pick_best(
         self,
@@ -655,64 +708,4 @@ class ProductAnalyzer:
             if p not in selected:
                 selected.append(p)
 
-        return selected[:n]
-
-    def score_product(self, product) -> float:
-        """
-        상품 ContentScore 계산 (0~100).
-        리뷰 점수 + 할인율 + 이름 길이 + 이미지 유무 반영.
-        """
-        score = product.review_score or 70.0
-
-        # 할인율 보너스 (최대 +15)
-        score += min(product.discount_rate / 2, 15)
-
-        # 이미지 보너스
-        if product.image_url:
-            score += 5
-
-        # 적정 가격대 보너스 (3,000~80,000원)
-        if 3_000 <= product.price <= 80_000:
-            score += 5
-
-        # 상품명 품질 (5자 미만 페널티)
-        if len(product.product_name) < 5:
-            score -= 10
-
-        return round(min(max(score, 0), 100), 1)
-
-
-# ---------------------------------------------------------------------------
-# 실행 테스트
-# ---------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    import json
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(message)s",
-    )
-
-    analyzer = ProductAnalyzer()
-
-    # 스토어 개별 테스트
-    print("\n=== 5makase.com 테스트 ===")
-    makase_products = analyzer.fetch_store("5makase", limit=5)
-    for p in makase_products:
-        print(f"  [{p.category}] {p.product_name} | ₩{p.price:,} | score={p.review_score}")
-
-    print("\n=== 삿포로팩토리 Naver 테스트 ===")
-    sapporo_products = analyzer.fetch_store("sapporofactory", limit=5)
-    for p in sapporo_products:
-        print(f"  [{p.category}] {p.product_name} | ₩{p.price:,} | score={p.review_score}")
-
-    # 전체 + 베스트 픽
-    print("\n=== 전체 수집 + 오늘 발행 4개 선별 ===")
-    all_products = analyzer.fetch_all(per_store=10)
-    best = analyzer.pick_best(all_products, n=4)
-    for i, p in enumerate(best, 1):
-        final_score = analyzer.score_product(p)
-        print(f"  {i}. [{p.store_name}] {p.product_name}")
-        print(f"     score={final_score} | url={p.product_url[:60]}...")
-        hint = p.to_story_hint()
-        print(f"     hint={json.dumps(hint, ensure_ascii=False)}")
+ 
