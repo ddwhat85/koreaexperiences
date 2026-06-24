@@ -592,14 +592,21 @@ class ProductAnalyzer:
         if exclude_ids is None:
             exclude_ids = set()
 
-        filtered = [
-            p for p in products
-            if p.product_id not in exclude_ids
-            and p.product_name
-            and p.image_url
-            and self.min_price <= p.price <= self.max_price
-            and p.review_score >= self.min_score
-        ]
+        filtered = []
+        for p in products:
+            if p.product_id in exclude_ids:
+                continue
+            if not p.product_name:
+                continue
+            # 이미지 없으면 제외하지 말고 플레이스홀더 유지 (og:image 실패해도 발행 가능)
+            if not (self.min_price <= p.price <= self.max_price):
+                logger.debug(f"[pick_best] 가격 필터 제외: {p.product_name[:20]} price={p.price}")
+                continue
+            if p.review_score < self.min_score:
+                logger.debug(f"[pick_best] 점수 필터 제외: {p.product_name[:20]} score={p.review_score}")
+                continue
+            filtered.append(p)
+        logger.info(f"[pick_best] {len(products)}개 중 {len(filtered)}개 통과 (image필터 해제)")
 
         filtered.sort(key=lambda p: p.review_score, reverse=True)
 
