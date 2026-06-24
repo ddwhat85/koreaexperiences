@@ -608,7 +608,20 @@ class ProductAnalyzer:
             filtered.append(p)
         logger.info(f"[pick_best] {len(products)}개 중 {len(filtered)}개 통과 (image필터 해제)")
 
-        filtered.sort(key=lambda p: p.review_score, reverse=True)
+        def _score(p):
+            base = p.review_score
+            # 의류/패션 스토어 우선 (portablejapan)
+            if p.store_key == "portablejapan":
+                base += 25.0
+            # 의류 카테고리 키워드 감지
+            cat = p.category.lower()
+            name = p.product_name.lower()
+            if any(k in cat for k in ("의류", "패션", "clothing", "apparel", "wear", "shirt", "pants")):
+                base += 20.0
+            if any(k in name for k in ("티셔츠", "바지", "원피스", "자켓", "코트", "셔츠", "블라우스", "가디건", "니트", "후드", "점퍼")):
+                base += 15.0
+            return base
+        filtered.sort(key=_score, reverse=True)
 
         # 스토어별 최대 1개씩 우선 선택 (다양성)
         selected = []
