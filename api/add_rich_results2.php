@@ -2,78 +2,10 @@
 if(($_POST['k']??'')!=='rich2'){http_response_code(403);exit('forbidden');}
 $f=dirname(__DIR__).'/index.html';
 $html=file_get_contents($f);
-if(strpos($html,'search-rich-v2')!==false){echo 'already done';exit;}
-// Remove old v1 rich results
-$html=preg_replace('/<style id="search-rich-injected">.*?<\/style>/s','',$html);
-$html=preg_replace('/<script id="search-rich-js">.*?<\/script>/s','',$html);
-$inject=<<<'END'
-<style id="search-rich-v2">
-#search-results{background:transparent!important;padding:0!important;}
-.sr-card{display:flex;gap:12px;background:#fff;border-radius:10px;padding:10px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,.07);cursor:pointer;transition:box-shadow .15s;}
-.sr-card:hover{box-shadow:0 3px 10px rgba(0,0,0,.13);}
-.sr-thumb{width:80px;height:80px;min-width:80px;border-radius:7px;object-fit:cover;background:#f0ede8;}
-.sr-thumb-ph{width:80px;height:80px;min-width:80px;border-radius:7px;background:linear-gradient(135deg,#f0ede8,#e8e0d0);display:flex;align-items:center;justify-content:center;font-size:26px;}
-.sr-info{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;}
-.sr-title{font-weight:600;font-size:14px;color:#222;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.sr-addr{font-size:12px;color:#888;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.sr-tags{display:flex;flex-wrap:wrap;gap:4px;}
-.sr-tag{font-size:11px;background:#f5f0e8;color:#8b6914;border-radius:20px;padding:2px 8px;font-weight:500;}
-#search-attribution{text-align:center;font-size:11px;color:#bbb;margin-top:6px;padding-top:6px;border-top:1px solid #eee;}
-</style>
-<script id="search-rich-v2-js">
-document.addEventListener('DOMContentLoaded',function(){
-  var TYPE={12:['Tourist','🏞️'],14:['Cultural','🏛️'],15:['Festival','🎉'],25:['TravelCourse','🗺️'],28:['Leisure','🏄'],32:['Stay','🏨'],38:['Shopping','🛍️'],39:['Food','🍜']};
-  function renderCards(items,box){
-    box.innerHTML='';
-    if(!items||!items.length){box.innerHTML='<div style="padding:16px;color:#999;text-align:center">No results found. Try: Seoul, Busan, temple, museum</div>';return;}
-    items.forEach(function(it){
-      var t=TYPE[it.contenttypeid]||['Spot','📍'];
-      var card=document.createElement('div');
-      card.className='sr-card';
-      var left;
-      if(it.firstimage){
-        left=document.createElement('img');
-        left.className='sr-thumb';
-        left.src=it.firstimage;
-        left.alt='';
-        left.loading='lazy';
-        left.onerror=function(){var ph=document.createElement('div');ph.className='sr-thumb-ph';ph.textContent=t[1];this.parentNode.replaceChild(ph,this);};
-      }else{
-        left=document.createElement('div');
-        left.className='sr-thumb-ph';
-        left.textContent=t[1];
-      }
-      var addr=(it.addr1||'').replace(/,?\s*(South Korea|Republic of Korea)$/i,'').trim();
-      var info=document.createElement('div');
-      info.className='sr-info';
-      info.innerHTML='<div class="sr-title">'+it.title+'</div><div class="sr-addr">📍 '+addr+'</div><div class="sr-tags"><span class="sr-tag">#'+t[0]+'</span></div>';
-      card.appendChild(left);
-      card.appendChild(info);
-      card.onclick=function(){window.open('https://www.google.com/search?q='+encodeURIComponent(it.title+' Korea'),'_blank');};
-      box.appendChild(card);
-    });
-    var attr=document.createElement('div');
-    attr.id='search-attribution';
-    attr.textContent='Source: Korea Tourism Organization (한국관광공사) official registered spots';
-    box.appendChild(attr);
-  }
-  window.searchAPI=function(){
-    var inp=document.getElementById('search-input');
-    var kw=(inp?inp.value:'').trim();
-    var box=document.getElementById('search-results');
-    if(!kw){if(box)box.innerHTML='';return;}
-    if(box)box.innerHTML='<div style="padding:16px;color:#aaa;text-align:center">Searching...</div>';
-    fetch('/api/proxy.php?action=search&keyword='+encodeURIComponent(kw)+'&numOfRows=20')
-      .then(function(r){return r.json();})
-      .then(function(d){
-        var items=d&&d.response&&d.response.body&&d.response.body.items&&d.response.body.items.item||[];
-        renderCards(Array.isArray(items)?items:[items],box);
-      })
-      .catch(function(){if(box)box.innerHTML='<div style="padding:16px;color:#c00;text-align:center">Error loading results</div>';});
-  };
-});
-</script>
-END;
-$html=str_replace('</head>',$inject.'</head>',$html);
+if(strpos($html,'card-photos-v4-static')!==false){echo 'already done';exit;}
+$html=preg_replace('/<style id="card-photos[^"]*">[\s\S]*?<\/style>/','', $html);
+$html=preg_replace('/<script id="card-photos[^"]*">[\s\S]*?<\/script>/','', $html);
+$cph='<style id="card-photos-v4-static">.explore-card{padding:0!important;overflow:hidden!important;border-radius:14px!important;display:flex!important;flex-direction:column!important;}.ec-photo{width:100%;height:130px;object-fit:cover;display:block;border-radius:14px 14px 0 0;flex-shrink:0;}.ec-body{padding:12px 14px 14px;display:flex;flex-direction:column;gap:5px;flex:1;}.ec-icon{display:none!important;}.ec-name{margin:0!important;font-weight:600;}.ec-badge{margin:0!important;}</style><script id="card-photos-v4-static">(function(){var P={"Seoul":"https://images.unsplash.com/photo-1538485399081-7191377e8241?w=400&q=80","Busan":"https://images.unsplash.com/photo-1617348938420-ccf7c5eb4726?w=400&q=80","Jeju":"https://images.unsplash.com/photo-1534939561126-855b8675edd7?w=400&q=80","Boryeong":"https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=80","Gyeongju":"https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=400&q=80","Jeonju":"https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&q=80","Gangwon-do":"https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&q=80","Yeosu":"https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=400&q=80","Food":"https://images.unsplash.com/photo-1498654896293-37aacf113fd9?w=400&q=80","Craft":"https://images.unsplash.com/photo-1509909756405-be0199881695?w=400&q=80","Heritage":"https://images.unsplash.com/photo-1520645521318-f03a712f0e67?w=400&q=80","Wellness":"https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&q=80","K-pop":"https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&q=80","Sea":"https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=400&q=80","Performance":"https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?w=400&q=80","Photography":"https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80","Sports":"https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=400&q=80","Language":"https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400&q=80","Brewery & Winery":"https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=400&q=80","Film & Drama":"https://images.unsplash.com/photo-1440404653325-ab127d49abc1?w=400&q=80","Cinema":"https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&q=80","Folk Village":"https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&q=80","Nightlife":"https://images.unsplash.com/photo-1541532713592-79a0317b6b77?w=400&q=80","Home Life":"https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400&q=80","Seasonal":"https://images.unsplash.com/photo-1490806843957-31f4c9a91c65?w=400&q=80"};function addPhoto(card){var nameEl=card.querySelector(".ec-name");if(!nameEl)return;var name=nameEl.textContent.trim();var url=P[name];if(!url)return;var existing=card.querySelector(".ec-photo");if(existing){if(existing.src.indexOf("unsplash")<0)existing.src=url;return;}var badge=card.querySelector(".ec-badge");if(nameEl&&badge&&!nameEl.closest(".ec-body")){var body=document.createElement("div");body.className="ec-body";var nc=nameEl.cloneNode(true);var bc=badge.cloneNode(true);card.appendChild(body);body.appendChild(nc);body.appendChild(bc);nameEl.remove();badge.remove();}var img=document.createElement("img");img.className="ec-photo";img.src=url;img.alt=name;img.loading="lazy";card.insertBefore(img,card.firstChild);}function run(){document.querySelectorAll(".explore-card").forEach(addPhoto);}if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",run);}else{setTimeout(run,100);}setTimeout(run,600);setTimeout(run,1500);setTimeout(run,3000);if(window.MutationObserver){new MutationObserver(run).observe(document.body,{childList:true,subtree:true});}})();<\/script>';
+$html=str_replace('</head>',$cph.'</head>',$html);
 file_put_contents($f,$html);
-echo 'rich v2 injected';
+echo 'card-photos-v4-static done';
