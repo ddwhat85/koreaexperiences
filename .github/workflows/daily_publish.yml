@@ -32,6 +32,8 @@ jobs:
         NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
         NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
         AI_PROVIDER: openai
+        PYTHONUTF8: "1"
+        PYTHONIOENCODING: "utf-8"
       run: |
         cd traffic-ai-engine
         mkdir -p logs state
