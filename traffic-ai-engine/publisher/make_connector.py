@@ -117,8 +117,11 @@ class MakeConnector:
         if packet.target_time not in PUBLISH_SLOTS:
             logger.warning(f"target_time '{packet.target_time}' not in recommended slots")
 
+        # 구매 링크 본문 끝에 추가 (안전 검사 통과 후)
+        payload = packet.to_webhook_payload()
+        payload["content"] = payload["content"] + "\n\n구매링크 → https://www.5makase.com"
         payload_bytes = json.dumps(
-            packet.to_webhook_payload(), ensure_ascii=False
+            payload, ensure_ascii=False
         ).encode("utf-8")
 
         logger.info(f"[SEND] id={packet.product_id} | time={packet.target_time}")
