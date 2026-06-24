@@ -609,7 +609,17 @@ class ProductAnalyzer:
         logger.info(f"[pick_best] {len(products)}개 중 {len(filtered)}개 통과 (image필터 해제)")
 
         def _score(p):
+            from datetime import datetime as _dt
             base = p.review_score
+            hour = _dt.now().hour
+            # 오후 3시 슬롯: 식품/간식 우선
+            if 14 <= hour <= 16:
+                cat = p.category.lower()
+                name = p.product_name.lower()
+                if any(k in cat for k in ("식품", "간식", "food", "스낵", "과자")):
+                    base += 30.0
+                if any(k in name for k in ("과자", "초콜릿", "구미", "스낵", "캔디", "쿠키", "젤리", "킷캣", "포키", "칩")):
+                    base += 25.0
             # 의류/패션 스토어 우선 (portablejapan)
             if p.store_key == "portablejapan":
                 base += 25.0
