@@ -3,108 +3,83 @@ if(($_POST['k']??'')!=='photo3'){http_response_code(403);exit('forbidden');}
 $f=dirname(__DIR__).'/index.html';
 $html=file_get_contents($f);
 if(strpos($html,'card-photos-v3')!==false){echo 'already done';exit;}
-$html=preg_replace('/<style id="card-photos-v2">.*?<\/style>/s','',$html);
-$html=preg_replace('/<script id="card-photos-v2-js">.*?<\/script>/s','',$html);
+$html=preg_replace('/<style id="card-photos-injected">[\s\S]*?<\/style>/','', $html);
+$html=preg_replace('/<script id="card-photos-js">[\s\S]*?<\/script>/','', $html);
+$html=preg_replace('/<style id="card-photos-v2">[\s\S]*?<\/style>/','', $html);
+$html=preg_replace('/<script id="card-photos-v2-js">[\s\S]*?<\/script>/','', $html);
 $inject=<<<'END'
 <style id="card-photos-v3">
-.explore-card{padding:0!important;overflow:hidden!important;align-items:stretch!important;}
-.ec-photo{width:100%;height:130px;object-fit:cover;display:block;border-radius:12px 12px 0 0;background:#f0ede8;}
-.ec-photo-ph{width:100%;height:130px;background:linear-gradient(135deg,#e8e0d0,#f5f0e8);display:flex;align-items:center;justify-content:center;font-size:36px;border-radius:12px 12px 0 0;}
-.ec-body{padding:12px 14px 14px;display:flex;flex-direction:column;gap:5px;}
+.explore-card{padding:0!important;overflow:hidden!important;border-radius:14px!important;display:flex!important;flex-direction:column!important;}
+.ec-photo{width:100%;height:130px;object-fit:cover;display:block;border-radius:14px 14px 0 0;flex-shrink:0;}
+.ec-body{padding:12px 14px 14px;display:flex;flex-direction:column;gap:5px;flex:1;}
 .ec-icon{display:none!important;}
+.ec-name{margin:0!important;font-weight:600;}
+.ec-badge{margin:0!important;}
 </style>
 <script id="card-photos-v3-js">
-document.addEventListener('DOMContentLoaded',function(){
-  // Use search action - works with English TourAPI
-  // Type 76=Tourist Attraction, 78=Cultural Facility (best scenic photos)
-  var CITY={
-    'Seoul':'Seoul+landmark',
-    'Busan':'Busan',
-    'Jeju':'Jeju',
-    'Boryeong':'Boryeong',
-    'Gyeongju':'Gyeongju',
-    'Jeonju':'Jeonju+hanok',
-    'Gangwon-do':'Gangwon+mountain',
-    'Yeosu':'Yeosu'
-  };
-  var CAT={
-    'Food':'Korean+traditional+food',
-    'Craft':'Korean+craft+heritage',
-    'Heritage':'Korean+palace+heritage',
-    'Wellness':'Korean+spa+hot+spring',
-    'K-pop':'K-pop+Korea',
-    'Sea':'Korean+island+coast',
-    'Performance':'Korean+traditional+performance',
-    'Photography':'Korea+scenic+nature',
-    'Sports':'Korean+sports',
-    'Language':'Korea+culture',
-    'Brewery & Winery':'Korean+wine+brewery',
-    'Film & Drama':'Korean+drama+location',
-    'Cinema':'Korean+film+cinema',
-    'Folk Village':'Korean+folk+village'
-  };
-  var SKIP=['mart','shop','store','outlet','tax refund','branch','franchise','편의점','지점','면세'];
-
-  function goodItem(i){
-    if(!i.firstimage||!i.firstimage.trim())return false;
-    var t=(i.title||'').toLowerCase();
-    return !SKIP.some(function(s){return t.indexOf(s)>=0;});
-  }
-
-  function wrapBody(card){
-    var name=card.querySelector('.ec-name');
-    var badge=card.querySelector('.ec-badge');
-    if(!name||name.parentNode.classList.contains('ec-body'))return;
-    var body=document.createElement('div');
-    body.className='ec-body';
-    body.appendChild(name.cloneNode(true));
-    body.appendChild(badge.cloneNode(true));
-    name.remove();badge.remove();
-    card.appendChild(body);
-  }
-
-  function applyPhoto(card,imgUrl){
-    wrapBody(card);
-    var existing=card.querySelector('.ec-photo,.ec-photo-ph');
-    if(existing)existing.remove();
-    var img=document.createElement('img');
-    img.className='ec-photo';
-    img.src=imgUrl;img.alt='';img.loading='lazy';
-    img.onerror=function(){
-      var ph=document.createElement('div');ph.className='ec-photo-ph';
-      var icon=card.querySelector('.ec-icon');
-      ph.textContent=icon?icon.textContent:'📍';
-      img.parentNode&&img.parentNode.replaceChild(ph,img);
-    };
-    card.insertBefore(img,card.firstChild);
-  }
-
-  function fetchImg(keyword,cb){
-    // First try type 76 (Tourist Attraction)
-    fetch('/api/proxy.php?action=search&keyword='+keyword+'&numOfRows=50')
-      .then(function(r){return r.json();})
-      .then(function(d){
-        var items=d&&d.response&&d.response.body&&d.response.body.items&&d.response.body.items.item||[];
-        if(!Array.isArray(items))items=[items];
-        // Prefer type 76, then 78, then any with image
-        var found=items.find(function(i){return goodItem(i)&&i.contenttypeid==76;});
-        if(!found)found=items.find(function(i){return goodItem(i)&&i.contenttypeid==78;});
-        if(!found)found=items.find(goodItem);
-        if(found)cb(found.firstimage);
-      }).catch(function(){});
-  }
-
-  setTimeout(function(){
-    document.querySelectorAll('.explore-card').forEach(function(card){
-      var name=(card.querySelector('.ec-name')||{}).textContent||'';
-      name=name.trim();
-      var panel=card.closest('.explore-panel');
-      var isFree=panel&&panel.id==='ep-free';
-      var kw=isFree?CITY[name]:CAT[name];
-      if(kw)fetchImg(kw,function(imgUrl){applyPhoto(card,imgUrl);});
-    });
-  },500);
-});
+(function(){
+var P={
+'Seoul':'https://images.unsplash.com/photo-1538485399081-7191377e8241?w=400&q=80',
+'Busan':'https://images.unsplash.com/photo-1617348938420-ccf7c5eb4726?w=400&q=80',
+'Jeju':'https://images.unsplash.com/photo-1534939561126-855b8675edd7?w=400&q=80',
+'Boryeong':'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=80',
+'Gyeongju':'https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=400&q=80',
+'Jeonju':'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&q=80',
+'Gangwon-do':'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&q=80',
+'Yeosu':'https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=400&q=80',
+'Food':'https://images.unsplash.com/photo-1498654896293-37aacf113fd9?w=400&q=80',
+'Craft':'https://images.unsplash.com/photo-1509909756405-be0199881695?w=400&q=80',
+'Heritage':'https://images.unsplash.com/photo-1520645521318-f03a712f0e67?w=400&q=80',
+'Wellness':'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=400&q=80',
+'K-pop':'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&q=80',
+'Sea':'https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=400&q=80',
+'Performance':'https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?w=400&q=80',
+'Photography':'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80',
+'Sports':'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=400&q=80',
+'Language':'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400&q=80',
+'Brewery & Winery':'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=400&q=80',
+'Film & Drama':'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?w=400&q=80',
+'Cinema':'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&q=80',
+'Folk Village':'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&q=80',
+'Nightlife':'https://images.unsplash.com/photo-1541532713592-79a0317b6b77?w=400&q=80',
+'Home Life':'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400&q=80',
+'Seasonal':'https://images.unsplash.com/photo-1490806843957-31f4c9a91c65?w=400&q=80'
+};
+function addPhoto(card){
+var nameEl=card.querySelector('.ec-name');
+if(!nameEl)return;
+var name=nameEl.textContent.trim();
+var url=P[name];
+if(!url)return;
+var existing=card.querySelector('.ec-photo');
+if(existing){existing.src=url;return;}
+var badge=card.querySelector('.ec-badge');
+if(nameEl&&badge&&!nameEl.closest('.ec-body')){
+var body=document.createElement('div');
+body.className='ec-body';
+var nc=nameEl.cloneNode(true);
+var bc=badge.cloneNode(true);
+card.appendChild(body);
+body.appendChild(nc);
+body.appendChild(bc);
+nameEl.remove();
+badge.remove();
+}
+var img=document.createElement('img');
+img.className='ec-photo';
+img.src=url;
+img.alt=name;
+img.loading='lazy';
+card.insertBefore(img,card.firstChild);
+}
+function run(){document.querySelectorAll('.explore-card').forEach(addPhoto);}
+if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',run);}
+else{setTimeout(run,100);}
+setTimeout(run,600);
+setTimeout(run,1500);
+setTimeout(run,3000);
+if(window.MutationObserver){new MutationObserver(run).observe(document.body,{childList:true,subtree:true});}
+})();
 </script>
 END;
 $html=str_replace('</head>',$inject.'</head>',$html);
