@@ -305,6 +305,15 @@ class ContentWriter:
 7. AI처럼 들리는 문장 금지: '~것 같지 않니?', '~어떠세요?', '~해보세요', '~드립니다' 절대 금지
 8. 실제 사람이 핸드폰으로 빠르게 타이핑한 것처럼 — 완벽한 문장보다 약간 거친 게 더 자연스러움""".strip()
 
+# 첫 댓글 고정 템플릿 (5makase.com 홍보)
+FIRST_COMMENT_TEMPLATES = [
+    "사진 속 이 제품, 일본 직구로 구할 수 있어~ 5makase.com 한번 들러봐 👀",
+    "이거 일본 직구 궁금하면 → 5makase.com 에서 찾아봐! 일본 직구 전문이야",
+    "직구 링크 알고 싶으면 → www.5makase.com (일본 직구 전문 사이트)",
+    "이 상품 일본에서 직접 오는 거야~ 5makase.com 가면 더 많아",
+    "일본 직구 더 보고 싶으면 → 5makase.com 북마크 해둬!",
+]
+
     # 실제 바이럴 포스트 5개 예시 (시스템 프롬프트 내장)
     _POST_EXAMPLES = """[실제 포스트 예시 1 — ddwhat1985 쇼핑 발견체 (10줄+)]
 오늘 삿포로 놀러왔는데 니시마츠야 있어
@@ -503,7 +512,7 @@ class ContentWriter:
             logger.info(f"[GEN OK] attempt={attempt}")
             return ContentOutput(
                 content           = content,
-                first_comment     = data.get("first_comment", ""),
+                first_comment     = random.choice(FIRST_COMMENT_TEMPLATES),
                 faq_data          = data.get("faq", []),
                 tone_variant      = tone["label"],
                 structure_variant = structure["label"],
