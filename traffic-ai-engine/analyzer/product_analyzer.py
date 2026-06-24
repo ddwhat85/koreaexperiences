@@ -38,32 +38,19 @@ USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0",
 ]
 
-SOURCE_STORES = {
-    "sapporofactory": {
-        "name": "삿포로팩토리직구",
-        "url": "https://smartstore.naver.com/sapporofactory",
-        "type": "naver",
-        "city": "삿포로",
-    },
-    "portablejapan": {
-        "name": "포터블재팬직구",
-        "url": "https://smartstore.naver.com/portablejapan",
-        "type": "naver",
-        "city": "일본",
-    },
-    "dunkjapan": {
-        "name": "덩크재팬직구",
-        "url": "https://smartstore.naver.com/dunkjapan",
-        "type": "naver",
-        "city": "일본",
-    },
-    "geminijapan": {
-        "name": "제미니재팬직구",
-        "url": "https://smartstore.naver.com/geminijapan",
-        "type": "naver",
-        "city": "일본",
-    },
-}
+# 네이버 쇼핑 API 검색 키워드 목록
+# GitHub Actions에서 스마트스토어 직접 스크레이핑이 차단(429)되므로
+# 키워드 검색 방식으로 일본직구 상품을 수집합니다.
+SEARCH_KEYWORDS = [
+    {"query": "일본직구 드럭스토어", "category": "드럭스토어", "city": "일본"},
+    {"query": "일본 화장품 직구", "category": "뷰티/스킨케어", "city": "일본"},
+    {"query": "일본 과자 직구", "category": "식품/간식", "city": "일본"},
+    {"query": "일본 직구 생활용품", "category": "생활용품", "city": "일본"},
+    {"query": "삿포로 직구", "category": "드럭스토어", "city": "삿포로"},
+]
+
+# 하위 호환성을 위해 유지 (스크레이퍼 초기화에서 사용 안 함)
+SOURCE_STORES = {}
 
 # ---------------------------------------------------------------------------
 # 데이터 스키마
@@ -489,26 +476,83 @@ class ProductAnalyzer:
         self._scrapers = self._init_scrapers()
 
     def _init_scrapers(self) -> dict:
-        scrapers = {}
-        for key, meta in SOURCE_STORES.items():
-            if meta["type"] == "naver":
-                scrapers[key] = NaverSmartStoreScraper(key, self._client)
-        return scrapers
+        return {}  # 키워드 검색 방식에서는 스크레이퍼 불필요
 
     def fetch_all(self, per_store: int = 20) -> list:
-        """모든 스토어에서 상품 수집"""
+        """키워드별 네이버 쇼핑 API로 상품 수집"""
         all_products = []
-        for key, scraper in self._scrapers.items():
+        seen_ids = set()
+
+        naver_id = os.getenv("NAVER_CLIENT_ID", "")
+        naver_secret = os.getenv("NAVER_CLIENT_SECRET", "")
+
+        if not (naver_id and naver_secret):
+            logger.error("[ANALYZER] NAVER_CLIENT_ID/SECRET 미설정. 수집 불가.")
+            return []
+
+        for kw in SEARCH_KEYWORDS:
             try:
-                logger.info(f"[ANALYZER] {key} 수집 시작")
-                batch = scraper.fetch_products(per_store)
-                all_products.extend(batch)
-                logger.info(f"[ANALYZER] {key} 완료: {len(batch)}개")
+                logger.info(f"[ANALYZER] 키워드 검색: {kw['query']}")
+                batch = self._fetch_by_keyword(
+                    query=kw["query"],
+                    category=kw["category"],
+                    city=kw["city"],
+                    limit=per_store,
+                    naver_id=naver_id,
+                    naver_secret=naver_secret,
+                )
+                new = [p for p in batch if p.product_id not in seen_ids]
+                seen_ids.update(p.product_id for p in new)
+                all_products.extend(new)
+                logger.info(f"[ANALYZER] '{kw['query']}' → {len(new)}개")
             except Exception as e:
-                logger.error(f"[ANALYZER] {key} 오류: {e}")
+                logger.error(f"[ANALYZER] '{kw['query']}' 오류: {e}")
+
         logger.info(f"[ANALYZER] 총 {len(all_products)}개 수집")
         self._enrich_images(all_products)
         return all_products
+
+    def _fetch_by_keyword(self, query: str, category: str, city: str,
+                          limit: int, naver_id: str, naver_secret: str) -> list:
+        """네이버 쇼핑 API로 키워드 검색"""
+        import hashlib as _hashlib
+        NAVER_API_URL = "https://openapi.naver.com/v1/search/shop.json"
+        params = {"query": query, "display": min(limit, 100), "sort": "date"}
+        headers = {"X-Naver-Client-Id": naver_id, "X-Naver-Client-Secret": naver_secret}
+        try:
+            resp = requests.get(NAVER_API_URL, params=params, headers=headers, timeout=10)
+            resp.raise_for_status()
+            items = resp.json().get("items", [])
+            logger.info(f"[NAVER API] '{query}': {len(items)}개 수신")
+        except Exception as e:
+            logger.warning(f"[NAVER API] '{query}': {e}")
+            return []
+
+        products = []
+        for item in items:
+            name_clean = re.sub(r"<[^>]+>", "", item.get("title", "")).strip()
+            if not name_clean:
+                continue
+            price = int(re.sub(r"\D", "", item.get("lprice", "0")) or 0)
+            h_price = int(re.sub(r"\D", "", item.get("hprice", "0")) or 0)
+            raw_id = item.get("productId") or item.get("link", name_clean)[:20]
+            pid = "KW-" + _hashlib.md5(f"{query}:{raw_id}".encode()).hexdigest()[:8]
+            products.append(ProductData(
+                product_id=pid,
+                store_key="naver_search",
+                store_name=item.get("mallName", "네이버쇼핑"),
+                product_name=name_clean,
+                price=price,
+                original_price=h_price if h_price > price else price,
+                image_url=item.get("image", ""),
+                product_url=item.get("link", ""),
+                category=category,
+                tags=[item.get("brand", "")],
+                review_score=75.0,
+                city=city,
+                raw_data=item,
+            ))
+        return products
 
     def fetch_store(self, store_key: str, limit: int = 20) -> list:
         """특정 스토어만 수집"""
