@@ -646,17 +646,12 @@ class ProductAnalyzer:
 
     def _enrich_images(self, products: list) -> None:
         """
-        image_url이 비어 있거나 신뢰할 수 없는 도메인인 경우
+        image_url이 완전히 비어 있는 경우에만
         상품 페이지의 og:image 메타태그로 교체.
-        신뢰 도메인: naver.com, pstatic.net, smartstore.naver.com, 5makase.com
+        (untrusted domain URL도 그대로 사용 — 스토어 배너 오염 방지)
         """
-        TRUSTED = ("naver.com", "pstatic.net", "5makase.com", "kakaocdn.net")
-
         for p in products:
-            needs_refresh = (
-                not p.image_url
-                or not any(t in p.image_url for t in TRUSTED)
-            )
+            needs_refresh = not p.image_url
             if needs_refresh and p.product_url:
                 logger.debug(f"[OG:IMAGE] {p.product_name[:30]} → og:image 조회 중")
                 og_url = self._client.fetch_og_image(p.product_url)
