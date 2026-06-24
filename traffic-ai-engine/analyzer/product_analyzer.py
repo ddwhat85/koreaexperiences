@@ -621,11 +621,14 @@ class ProductAnalyzer:
                 selected.append(p)
                 used_stores.add(p.store_key)
 
-        # 부족하면 점수순으로 채우기
+        # 다양성 부족하면 점수순으로 채우기 (같은 store_key면 카테고리로 다양성)
         for p in filtered:
             if len(selected) >= n:
                 break
             if p not in selected:
                 selected.append(p)
+
+        logger.info(f"[pick_best] 선별 완료: {len(selected)}개")
+        return selected[:n]
 
  
