@@ -6,6 +6,7 @@ foreach($candidates as $c){
   if(file_exists($c)&&is_readable($c)){$tmp=file_get_contents($c);if(strlen($tmp)>10000){$f=$c;$h=$tmp;break;}}
 }
 if(!$f){echo 'err:no-index';exit;}
+$P='"%N%":"https://images.unsplash.com/photo-';
 $map=[
   'Sea'=>['1578637387939-43c525550085','1651102802469-61257fc0727f'],
   'Sports'=>['1566577739112-5180d4bf9390','1514050566906-8d077bae7046'],
@@ -15,8 +16,9 @@ $map=[
   ];
 $n=0;
 foreach($map as $name=>$pair){
-  $old='"'.$name.'":"'.$pair[0].'"';
-  $new='"'.$name.'":"'.$pair[1].'"';
+  $pre=str_replace('%N%',$name,$P);
+  $old=$pre.$pair[0];
+  $new=$pre.$pair[1];
   if(strpos($h,$old)!==false){$h=str_replace($old,$new,$h);$n++;}
 }
 $so='photo-1490806843957-31f4c9a91c65';
