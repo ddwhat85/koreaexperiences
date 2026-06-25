@@ -9,5 +9,6 @@ $h=str_replace('1540541337804-5b934a3a6d3b','1544161515-4ab6ce6db874',$h);
 $h=str_replace('1540575861122-da6f60d51e43','1493225457124-a3eb161ffa5f',$h);
 $h=str_replace('1434030216411-0b793f4b0d8a','1434030216411-0b793f4b4173',$h);
 $h=str_replace('1489599849927-9b1f1a71eb1e','1485846234645-a62644f84728',$h);
+$h=preg_replace('/<div style="font-size:1\.5rem;">.*?<\/div>/u','',$h);
 file_put_contents($f,$h);
-echo 'catimgs ok';
+echo 'catimgs+emoji ok';
