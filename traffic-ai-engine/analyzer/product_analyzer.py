@@ -42,6 +42,12 @@ USER_AGENTS = [
 # GitHub Actions에서 스마트스토어 직접 스크레이핑이 차단(429)되므로
 # 키워드 검색 방식으로 일본직구 상품을 수집합니다.
 SEARCH_KEYWORDS = [
+    # 우선 검색: 지정 스토어에서만 수집
+    {"query": "sapporofactory", "category": "드럭스토어", "city": "삿포로", "store_filter": "sapporofactory"},
+    {"query": "portablejapan", "category": "패션/의류", "city": "일본", "store_filter": "portablejapan"},
+    {"query": "dunkjapan", "category": "드럭스토어", "city": "일본", "store_filter": "dunkjapan"},
+    {"query": "geminijapan", "category": "일반상품", "city": "일본", "store_filter": "geminijapan"},
+    # 보조 검색: 키워드 기반
     {"query": "일본직구 드럭스토어", "category": "드럭스토어", "city": "일본"},
     {"query": "일본 화장품 직구", "category": "뷰티/스킨케어", "city": "일본"},
     {"query": "일본 과자 직구", "category": "식품/간식", "city": "일본"},
@@ -471,7 +477,7 @@ class ProductAnalyzer:
     def __init__(self):
         self.min_score = float(os.getenv("PA_MIN_SCORE", "60.0"))
         self.min_price = int(os.getenv("PA_MIN_PRICE", "0"))
-        self.max_price = int(os.getenv("PA_MAX_PRICE", "9990000"))
+        self.max_price = int(os.getenv("PA_MAX_PRICE", "500000"))
         self._client   = FetchClient()
         self._scrapers = self._init_scrapers()
 
@@ -500,6 +506,7 @@ class ProductAnalyzer:
                     limit=per_store,
                     naver_id=naver_id,
                     naver_secret=naver_secret,
+                    store_filter=kw.get("store_filter", ""),
                 )
                 new = [p for p in batch if p.product_id not in seen_ids]
                 seen_ids.update(p.product_id for p in new)
@@ -530,6 +537,12 @@ class ProductAnalyzer:
 
         products = []
         for item in items:
+            # 지정 스토어 필터
+            if store_filter:
+                mall = item.get("mallName", "").lower()
+                link = item.get("link", "").lower()
+                if store_filter not in mall and store_filter not in link:
+                    continue
             name_clean = re.sub(r"<[^>]+>", "", item.get("title", "")).strip()
             if not name_clean:
                 continue
@@ -608,9 +621,15 @@ class ProductAnalyzer:
             filtered.append(p)
         logger.info(f"[pick_best] {len(products)}개 중 {len(filtered)}개 통과 (image필터 해제)")
 
+        PRIORITY_STORES = {"sapporofactory", "portablejapan", "dunkjapan", "geminijapan"}
+
         def _score(p):
             from datetime import datetime as _dt
             base = p.review_score
+            # 지정 스토어 우선
+            store_lower = p.store_name.lower()
+            if any(s in store_lower for s in PRIORITY_STORES):
+                base += 60.0
             hour = _dt.now().hour
             # 오후 3시 슬롯: 식품/간식 우선
             if 14 <= hour <= 16:
