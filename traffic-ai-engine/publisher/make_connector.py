@@ -1,6 +1,6 @@
 """
 publisher/make_connector.py
-TrafficAI Engine 1.0 Ã¢ÂÂ Make.com Webhook Connector
+TrafficAI Engine 1.0 — Make.com Webhook Connector
 
 Data flow: Python Engine -> Make.com Webhook -> Google Sheets log + Buffer -> Threads
 """
@@ -42,12 +42,12 @@ class PublishPacket:
     story_theme: str = ""
     first_comment: str = ""
     generation_attempt: int = 1
+    pipeline_id: str = field(default_factory=lambda: datetime.utcnow().strftime("%Y%m%d-%H%M%S"))
+    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
     def __post_init__(self):
         if not self.first_comment and self.product_url:
             self.first_comment = self.product_url
-    pipeline_id: str = field(default_factory=lambda: datetime.utcnow().strftime("%Y%m%d-%H%M%S"))
-    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
     def to_webhook_payload(self) -> dict:
         return {
@@ -123,11 +123,8 @@ class MakeConnector:
         if packet.target_time not in PUBLISH_SLOTS:
             logger.warning(f"target_time '{packet.target_time}' not in recommended slots")
 
-        # ÃªÂµÂ¬Ã«Â§Â¤ Ã«Â§ÂÃ­ÂÂ¬ Ã«Â³Â¸Ã«Â¬Â¸ Ã«ÂÂÃ¬ÂÂ Ã¬Â¶ÂÃªÂ°Â (Ã¬ÂÂÃ¬Â Â ÃªÂ²ÂÃ¬ÂÂ¬ Ã­ÂÂµÃªÂ³Â¼ Ã­ÂÂ)
-        payload = packet.to_webhook_payload()
-        payload["content"] = payload["content"] + "\n\nÃªÂµÂ¬Ã«Â§Â¤Ã«Â§ÂÃ­ÂÂ¬ Ã¢ÂÂ https://www.5makase.com"
         payload_bytes = json.dumps(
-            payload, ensure_ascii=False
+            packet.to_webhook_payload(), ensure_ascii=False
         ).encode("utf-8")
 
         logger.info(f"[SEND] id={packet.product_id} | time={packet.target_time}")
@@ -180,7 +177,7 @@ if __name__ == "__main__":
         product_name = "test product",
         image_url    = "https://example.com/image.jpg",
         product_url  = "https://example.com/product",
-        content      = "Ã­ÂÂÃ¬ÂÂ¤Ã­ÂÂ¸ Ã¬Â½ÂÃ­ÂÂÃ¬Â¸Â . Ã¬ÂÂ¼Ã«Â³Â¸ Ã¬ÂÂ¬Ã­ÂÂ ÃªÂ°ÂÃ«Â©Â´ ÃªÂ¼Â­ Ã¬ÂÂ¬Ã«Â´ÂÃ¬ÂÂ¼ Ã­ÂÂ  Ã¬ÂÂÃ¬ÂÂ´Ã­ÂÂ Ã¬ÂÂÃ¬ÂÂ´?",
+        content      = "테스트 콘텐츠. 일본 여행 가면 꼭 사봐야 할 아이템 있어?",
         target_time  = pick_target_time(),
     )
     result = connector.send(sample)
