@@ -369,7 +369,7 @@
       <div class="hub-group">
         <div class="hub-group-head">
           <h2>Hidden &amp; local</h2>
-          <span class="sub">Unlock full details with a short ad — always free</span>
+          <span class="sub">Full details — always free to read</span>
         </div>
         <div class="tile-grid" id="paid-tiles"></div>
       </div>
@@ -943,7 +943,7 @@ return `<div class="cat-tile free" onclick="openList('free','${city}')" style="$
     document.getElementById('list-title').textContent = key;
     document.getElementById('list-sub').textContent = type === 'free'
       ? `Free, well-known spots in ${key}`
-      : `Unlock address & contact with a short ad — free`;
+      : `Address & contact — free to read`;
 
     // sub-filter: for free, filter by category within city; for paid, filter by city within category
     const subField = type === 'free' ? 'cat' : 'city';
@@ -1015,7 +1015,7 @@ return `<div class="cat-tile free" onclick="openList('free','${city}')" style="$
             <div class="poi-desc">${p.desc}</div>
             <div class="poi-footer">
               <span class="poi-price free-text">Free</span>
-              <span class="poi-ad-lock">🔒 Unlock with ad</span>
+              <span class="poi-ad-lock">Free details</span>
             </div>
           </div>
         </div>`;
