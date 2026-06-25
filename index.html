@@ -1048,13 +1048,7 @@ return `<div class="cat-tile free" onclick="openList('free','${city}')" style="$
       const gid = 'adgate-' + sk;
       const rid = 'adreveal-' + sk;
       bottomBlock = `
-        <div id="${gid}" class="ad-gate-box">
-          <div class="ag-icon">🔓</div>
-          <div class="ag-title">Unlock address &amp; contact details</div>
-          <div class="ag-sub">Watch a short ad to reveal the full details — completely free, no account needed.</div>
-          <button class="ad-unlock-btn" onclick="watchAd('${sk}','${gid}','${rid}')">▶ Watch ad to unlock</button>
-        </div>
-        <div id="${rid}" style="display:none;">
+        <div>
           <div class="info-row"><div class="label">Address</div><div class="value">${item.addr}</div></div>
           <div class="info-row"><div class="label">Contact</div><div class="value">${item.phone}</div></div>
           <div class="info-row"><div class="label">Website</div><div class="value">${item.site}</div></div>
