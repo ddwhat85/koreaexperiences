@@ -57,7 +57,7 @@ class PublishPacket:
             "image_url":          self.image_url,
             "product_url":        self.product_url,
             "first_comment":      self.first_comment,
-            "content":            self.content,
+            "content":            self.content + "\n5makase.com",
             "target_time":        self.target_time,
             "faq_data":           [asdict(f) for f in self.faq_data],
             "review_score":       self.review_score,
