@@ -42,12 +42,6 @@ USER_AGENTS = [
 # GitHub Actions에서 스마트스토어 직접 스크레이핑이 차단(429)되므로
 # 키워드 검색 방식으로 일본직구 상품을 수집합니다.
 SEARCH_KEYWORDS = [
-    # 우선 검색: 지정 스토어에서만 수집
-    {"query": "sapporofactory", "category": "드럭스토어", "city": "삿포로", "store_filter": "sapporofactory"},
-    {"query": "portablejapan", "category": "패션/의류", "city": "일본", "store_filter": "portablejapan"},
-    {"query": "dunkjapan", "category": "드럭스토어", "city": "일본", "store_filter": "dunkjapan"},
-    {"query": "geminijapan", "category": "일반상품", "city": "일본", "store_filter": "geminijapan"},
-    # 보조 검색: 키워드 기반
     {"query": "일본직구 드럭스토어", "category": "드럭스토어", "city": "일본"},
     {"query": "일본 화장품 직구", "category": "뷰티/스킨케어", "city": "일본"},
     {"query": "일본 과자 직구", "category": "식품/간식", "city": "일본"},
@@ -629,9 +623,10 @@ class ProductAnalyzer:
         def _score(p):
             from datetime import datetime as _dt
             base = p.review_score
-            # 지정 스토어 우선
+            # 지정 스토어 우선 (URL 또는 스토어명으로 판별)
+            url_lower = p.product_url.lower()
             store_lower = p.store_name.lower()
-            if any(s in store_lower for s in PRIORITY_STORES):
+            if any(s in url_lower or s in store_lower for s in PRIORITY_STORES):
                 base += 60.0
             # 지정 스토어 우선
             store_lower = p.store_name.lower()
