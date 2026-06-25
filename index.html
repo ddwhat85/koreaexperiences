@@ -306,7 +306,7 @@
 
 <header class="hero">
   <div class="container">
-    <div class="hero-eyebrow">PLAN YOUR TRIP</div><img src="korea-travel.png" alt="Korea travel illustration" style="display:block;width:100%;max-width:420px;height:auto;margin:14px 0 4px;border-radius:16px;">
+    <div class="hero-eyebrow">PLAN YOUR TRIP</div><img src="korea-travel.png" alt="Korea travel illustration" style="display:block;width:100%;max-width:600px;height:auto;margin:24px auto 16px;border-radius:20px;">
     <h1>Find what to do in Korea —<br>the famous spots and the hidden ones</h1>
     <p>Browse by category instead of scrolling forever. Tell us when and where you're going, and we'll narrow it down further.</p>
 
@@ -921,6 +921,7 @@ return `<div class="cat-tile free" onclick="openList('free','${city}')" style="$
           <div class="cat-name" style="${TILE_PHOTOS[cat]?'position:relative;z-index:1;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,0.7);':''}">${cat}</div>
           <div class="cat-count" style="${TILE_PHOTOS[cat]?'position:relative;z-index:1;color:rgba(255,255,255,0.9);text-shadow:0 1px 4px rgba(0,0,0,0.7);':''}">${count} experience${count===1?'':'s'}</div>
         </div>`
+  }).join('');
   }
 
   // ---------- LIST VIEW STATE ----------
