@@ -1,6 +1,6 @@
 """
 publisher/make_connector.py
-TrafficAI Engine 1.0 — Make.com Webhook Connector
+TrafficAI Engine 1.0 Ã¢ÂÂ Make.com Webhook Connector
 
 Data flow: Python Engine -> Make.com Webhook -> Google Sheets log + Buffer -> Threads
 """
@@ -40,7 +40,12 @@ class PublishPacket:
     faq_data: list = field(default_factory=list)
     review_score: float = 0.0
     story_theme: str = ""
+    first_comment: str = ""
     generation_attempt: int = 1
+
+    def __post_init__(self):
+        if not self.first_comment and self.product_url:
+            self.first_comment = self.product_url
     pipeline_id: str = field(default_factory=lambda: datetime.utcnow().strftime("%Y%m%d-%H%M%S"))
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
@@ -51,7 +56,8 @@ class PublishPacket:
             "store_name":         self.store_name,
             "product_name":       self.product_name,
             "image_url":          self.image_url,
-
+            "product_url":        self.product_url,
+            "first_comment":      self.first_comment,
             "content":            self.content,
             "target_time":        self.target_time,
             "faq_data":           [asdict(f) for f in self.faq_data],
@@ -117,9 +123,9 @@ class MakeConnector:
         if packet.target_time not in PUBLISH_SLOTS:
             logger.warning(f"target_time '{packet.target_time}' not in recommended slots")
 
-        # 구매 링크 본문 끝에 추가 (안전 검사 통과 후)
+        # ÃªÂµÂ¬Ã«Â§Â¤ Ã«Â§ÂÃ­ÂÂ¬ Ã«Â³Â¸Ã«Â¬Â¸ Ã«ÂÂÃ¬ÂÂ Ã¬Â¶ÂÃªÂ°Â (Ã¬ÂÂÃ¬Â Â ÃªÂ²ÂÃ¬ÂÂ¬ Ã­ÂÂµÃªÂ³Â¼ Ã­ÂÂ)
         payload = packet.to_webhook_payload()
-        payload["content"] = payload["content"] + "\n\n구매링크 → https://www.5makase.com"
+        payload["content"] = payload["content"] + "\n\nÃªÂµÂ¬Ã«Â§Â¤Ã«Â§ÂÃ­ÂÂ¬ Ã¢ÂÂ https://www.5makase.com"
         payload_bytes = json.dumps(
             payload, ensure_ascii=False
         ).encode("utf-8")
@@ -174,7 +180,7 @@ if __name__ == "__main__":
         product_name = "test product",
         image_url    = "https://example.com/image.jpg",
         product_url  = "https://example.com/product",
-        content      = "테스트 콘텐츠. 일본 여행 가면 꼭 사봐야 할 아이템 있어?",
+        content      = "Ã­ÂÂÃ¬ÂÂ¤Ã­ÂÂ¸ Ã¬Â½ÂÃ­ÂÂÃ¬Â¸Â . Ã¬ÂÂ¼Ã«Â³Â¸ Ã¬ÂÂ¬Ã­ÂÂ ÃªÂ°ÂÃ«Â©Â´ ÃªÂ¼Â­ Ã¬ÂÂ¬Ã«Â´ÂÃ¬ÂÂ¼ Ã­ÂÂ  Ã¬ÂÂÃ¬ÂÂ´Ã­ÂÂ Ã¬ÂÂÃ¬ÂÂ´?",
         target_time  = pick_target_time(),
     )
     result = connector.send(sample)
