@@ -46,8 +46,7 @@ class PublishPacket:
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
     def __post_init__(self):
-        if not self.first_comment and self.product_url:
-            self.first_comment = self.product_url
+        self.first_comment = "https://5makase.com"
 
     def to_webhook_payload(self) -> dict:
         return {
