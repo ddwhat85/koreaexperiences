@@ -520,7 +520,8 @@ class ProductAnalyzer:
         return all_products
 
     def _fetch_by_keyword(self, query: str, category: str, city: str,
-                          limit: int, naver_id: str, naver_secret: str) -> list:
+                          limit: int, naver_id: str, naver_secret: str,
+                          store_filter: str = "") -> list:
         """네이버 쇼핑 API로 키워드 검색"""
         import hashlib as _hashlib
         NAVER_API_URL = "https://openapi.naver.com/v1/search/shop.json"
@@ -623,9 +624,15 @@ class ProductAnalyzer:
 
         PRIORITY_STORES = {"sapporofactory", "portablejapan", "dunkjapan", "geminijapan"}
 
+        PRIORITY_STORES = {"sapporofactory", "portablejapan", "dunkjapan", "geminijapan"}
+
         def _score(p):
             from datetime import datetime as _dt
             base = p.review_score
+            # 지정 스토어 우선
+            store_lower = p.store_name.lower()
+            if any(s in store_lower for s in PRIORITY_STORES):
+                base += 60.0
             # 지정 스토어 우선
             store_lower = p.store_name.lower()
             if any(s in store_lower for s in PRIORITY_STORES):
