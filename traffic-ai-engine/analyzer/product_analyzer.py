@@ -471,7 +471,7 @@ class ProductAnalyzer:
     def __init__(self):
         self.min_score = float(os.getenv("PA_MIN_SCORE", "60.0"))
         self.min_price = int(os.getenv("PA_MIN_PRICE", "0"))
-        self.max_price = int(os.getenv("PA_MAX_PRICE", "500000"))
+        self.max_price = int(os.getenv("PA_MAX_PRICE", "9990000"))
         self._client   = FetchClient()
         self._scrapers = self._init_scrapers()
 
