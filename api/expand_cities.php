@@ -4,31 +4,37 @@ $candidates=[__DIR__.'/../index.html',$_SERVER['DOCUMENT_ROOT'].'/index.html',di
 $f=null;$h='';
 foreach($candidates as $c){if(file_exists($c)&&is_readable($c)){$tmp=file_get_contents($c);if(strlen($tmp)>10000){$f=$c;$h=$tmp;break;}}}
 if(!$f){echo 'err:no-index';exit;}
+$old='<script id="expand-cities">';
+if(strpos($h,$old)!==false){
+  $h=preg_replace('/<script id="expand-cities">.*?<\/script>/s','',$h);
+}
 $js='<script id="expand-cities">
   (function(){
   var cities=[
   ["Seoul","1532649097480-b67d52743b69"],
   ["Busan","1578637387939-43c525550085"],
-  ["Jeju","1592166547061-d8e7fb0c73db"],
+  ["Jeju","1598935898639-81586f7d2129"],
   ["Gyeongju","1528360983277-13d401cdc186"],
   ["Jeonju","1548115258-c20c82f25ef4"],
   ["Suwon","1703825864792-5880081beaaf"],
   ["Incheon","1601042179331-f9a0c765d5c2"],
   ["DMZ","1505118380757-91f5f5632de0"],
-  ["Daegu","1583032015879-e188b58da72a"],
-  ["Sokcho","1544979990-eefe7ffb2a74"],
-  ["Gangneung","1516477266110-766fe3e2b6d7"],
-  ["Andong","1558618047-c1b3e2a3e1b4"],
-  ["Gwangju","1516466723-95e4930b67e4"],
-  ["Nami Island","1580893842-e0e89e15b4e4"],
-  ["Bukchon","1578898118-eb6ee5a4b7e4"],
-  ["Yeosu","1495208679-78bf64480da5"]
+  ["Daegu","1556909114-af52b82b0d87"],
+  ["Sokcho","1504674900-67398128a141"],
+  ["Gangneung","1555993539-63e53df67c36"],
+  ["Andong","1533042507-5c7a06c8ad27"],
+  ["Gwangju","1536440136262-58dd6b5fdc4e"],
+  ["Nami Island","1548574762-85f10d5bdf91"],
+  ["Bukchon","1542038474-08a04b51c5ab"],
+  ["Yeosu","1540575467129-bfe0e9a04745"]
   ];
   function run(){
   var sec=document.getElementById("ep-free");
   if(!sec)return;
-  var lbl=sec.querySelector("h2,h3,.section-title,.explore-title,.panel-title");
+  var lbl=sec.querySelector(".explore-title,.panel-title,.section-title,h2,h3");
   if(lbl)lbl.textContent="Cities \u0026 Attractions";
+  var tab=document.querySelector("[data-panel=\"ep-free\"],[data-target=\"ep-free\"]");
+  if(tab)tab.childNodes[tab.childNodes.length-1].textContent=" Cities \u0026 Attractions";
   var g=sec.querySelector(".explore-grid");
   if(!g)return;
   var old=g.querySelectorAll(".ec-injected");
@@ -46,4 +52,4 @@ $js='<script id="expand-cities">
   </script>';
 $h=str_replace('</body>',$js.'</body>',$h);
 file_put_contents($f,$h);
-echo 'cities-expand ok';
+echo 'cities-v2 ok';
