@@ -40,7 +40,7 @@ jobs:
         mkdir -p logs state
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
           SLOT=$(python3 -c "from datetime import datetime, timedelta; kst = datetime.utcnow() + timedelta(hours=9, minutes=10); print(kst.strftime('%H:%M'))")
-          echo "수동 실행: 슬롯 $SLOT 로 즉시 발행"
+          echo "수동 실행: 슬롯 $SLOT"
           python daily_runner.py --slot $SLOT --limit 1
         else
           python daily_runner.py --limit 1
