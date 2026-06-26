@@ -234,6 +234,8 @@
   .med-item.open .chevron { transform: rotate(180deg); }
   .med-item-body { display: none; padding: 0 18px 18px; font-size: 13.5px; color: var(--text-soft); line-height: 1.6; }
   .med-item.open .med-item-body { display: block; }
+  .med-item-photo .med-item-head { min-height: 120px; }
+  .med-item-photo .med-item-head span:first-of-type { font-size: 15px; }
   .med-item-body .med-sub { font-weight: 700; color: var(--text); margin-top: 12px; margin-bottom: 4px; display: block; }
   .med-item-body ul { margin: 6px 0 0 18px; padding: 0; }
   .med-item-body li { margin-bottom: 4px; }
@@ -1083,17 +1085,25 @@ return `<div class="cat-tile free" onclick="openList('free','${city}')" style="$
   document.getElementById('overlay').addEventListener('click', (e) => { if(e.target.id === 'overlay') closeModal(); });
 
   // ---------- MEDICAL ----------
+  const MEDIMG = {0: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Eye_examination_visual_acuity.jpg/960px-Eye_examination_visual_acuity.jpg", 1: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Slit_lamp_Eye_examination_by_Ophthalmologist.jpg/960px-Slit_lamp_Eye_examination_by_Ophthalmologist.jpg", 2: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Doctor_takes_blood_pressure.jpg/960px-Doctor_takes_blood_pressure.jpg", 3: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/SPA_SKIN_CARE.jpg/960px-SPA_SKIN_CARE.jpg", 4: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/Seoul_National_University_Hospital_Main_Gate_20200128.jpg/960px-Seoul_National_University_Hospital_Main_Gate_20200128.jpg"};
   function renderMedical(){
     const container = document.getElementById('med-accordion');
-    container.innerHTML = MEDICAL.map((m, i) => `
-      <div class="med-item" id="med-item-${i}">
-        <div class="med-item-head" onclick="toggleMed(${i})">
-          <span>${m.title}</span>
-          <span class="chevron">▾</span>
+    container.innerHTML = MEDICAL.map((m, i) => {
+      const img = MEDIMG[i];
+      const headStyle = img ? 'background-image:url('+img+');background-size:cover;background-position:center;position:relative;overflow:hidden;min-height:120px;align-items:flex-end;' : '';
+      const overlay = img ? '<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0.15),rgba(0,0,0,0.6));pointer-events:none;z-index:0;"></div>' : '';
+      const titleStyle = img ? 'position:relative;z-index:1;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,0.8);' : '';
+      const chevStyle = img ? 'position:relative;z-index:1;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,0.8);' : '';
+      return `
+      <div class="med-item${img?' med-item-photo':''}" id="med-item-${i}">
+        <div class="med-item-head" onclick="toggleMed(${i})" style="${headStyle}">
+          ${overlay}
+          <span style="${titleStyle}">${m.title}</span>
+          <span class="chevron" style="${chevStyle}">▾</span>
         </div>
         <div class="med-item-body">${m.body}</div>
       </div>
-    `).join('');
+    `;}).join('');
   }
   function toggleMed(i){ document.getElementById('med-item-'+i).classList.toggle('open'); }
 
