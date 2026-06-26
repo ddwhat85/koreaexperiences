@@ -4,10 +4,12 @@ on:
   schedule:
     - cron: '10 23 * * *'
     - cron: '5 3 * * *'
-    - cron: '5 6 * * *'
     - cron: '20 9 * * *'
     - cron: '10 13 * * *'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   publish:
@@ -37,15 +39,14 @@ jobs:
         PYTHONIOENCODING: "utf-8"
       run: |
         cd traffic-ai-engine
-        mkdir -p logs state
-        SLOT=$(python3 -c "from datetime import datetime, timedelta; kst = datetime.utcnow() + timedelta(hours=9, minutes=10); print(kst.strftime('%H:%M'))")
-        echo "실행 슬롯: $SLOT"
-        python daily_runner.py --slot $SLOT --limit 1
+        mkdir -p state
+        python daily_runner.py --limit 1
 
     - name: Save publish state
       run: |
         git config user.name "TrafficAI Bot"
         git config user.email "trafficai@ddwhat85"
-        git add traffic-ai-engine/state/ traffic-ai-engine/logs/ || true
+        git pull --rebase origin main || true
+        git add traffic-ai-engine/state/published_ids.json || true
         git diff --staged --quiet || git commit -m "chore: publish state [skip ci]"
-        git push || true
+        git push origin main
