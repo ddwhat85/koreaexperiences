@@ -3,7 +3,7 @@ daily_runner.py
 TrafficAI Engine 1.0 — 일일 발행 오케스트레이터
 
 실행 방법:
-  python daily_runner.py               # 오늘 4개 슬롯 모두 발행
+  python daily_runner.py               # 오늘 가장 가까운 슬롯 1개 발행
   python daily_runner.py --dry-run     # 실제 전송 없이 콘텐츠 확인만
   python daily_runner.py --slot 18:20  # 특정 슬롯만 발행
   python daily_runner.py --store sapporofactory  # 특정 스토어만 사용
@@ -26,7 +26,7 @@ import random
 import sys
 import time
 from dataclasses import asdict
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -66,7 +66,6 @@ STATE_PATH = ROOT / "state" / "published_ids.json"
 
 
 def load_published_ids() -> set[str]:
-    """오늘 발행된 product_id 목록 로드"""
     if not STATE_PATH.exists():
         return set()
     try:
@@ -79,7 +78,6 @@ def load_published_ids() -> set[str]:
 
 
 def save_published_id(product_id: str) -> None:
-    """발행 성공한 product_id 저장"""
     STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
     today_str = date.today().isoformat()
     try:
@@ -88,7 +86,6 @@ def save_published_id(product_id: str) -> None:
         if product_id not in day_list:
             day_list.append(product_id)
         data[today_str] = day_list
-        # 30일 이상 된 날짜는 정리
         cutoff = date.today().toordinal() - 30
         data = {k: v for k, v in data.items()
                 if date.fromisoformat(k).toordinal() >= cutoff}
@@ -98,78 +95,83 @@ def save_published_id(product_id: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# KST 기준 현재 시각에 가장 가까운 슬롯 자동 감지
+# ---------------------------------------------------------------------------
+
+def detect_current_slot() -> str:
+    """GitHub Actions cron이 --slot 없이 실행될 때, 현재 KST 시각에서 가장 가까운 슬롯 반환."""
+    kst = timezone(timedelta(hours=9))
+    now = datetime.now(kst)
+    now_min = now.hour * 60 + now.minute
+    return min(
+        PUBLISH_SLOTS,
+        key=lambda s: abs(int(s[:2]) * 60 + int(s[3:]) - now_min)
+    )
+
+
+# ---------------------------------------------------------------------------
 # ProductData → StoryPacket 변환
 # ---------------------------------------------------------------------------
 
-# 도시별 대표 상황 힌트 풀
 CITY_SITUATIONS = {
     "삿포로": [
-        "삿포로 다누키코지 쇼핑 아케이드를 걷다가",
+        "삿포로 다누키코지 쿃핑 아케이드를 걸다가",
         "삿포로역 지하 아피아몰에서",
-        "오도리 공원 근처 드럭스토어 들렀다가",
-        "홋카이도 대학 캠퍼스 근처 편의점에서",
+        "오도리 공원 근체 드럭스토어 들렀다가",
+        "홈하이도 대학 캐퍼스 근체 편의점에서",
     ],
     "오사카": [
-        "도톤보리 돌아다니다 들린 마쓰키요에서",
-        "신사이바시 쇼핑 스트리트 걷다가",
+        "도톤보리 돌아다니다 들린 마씁키요에서",
+        "신사이바시 쿃핑 스트리트 걸다가",
         "우메다 한큐 지하 푸드홀 구경하다가",
-        "난바 파크스 근처 드럭스토어에서",
+        "난바 파크스 근체 드럭스토어에서",
     ],
     "도쿄": [
         "신주쿠 이세탄 지하 식품관 구경하다가",
-        "아키하바라 전자거리 걷다가 우연히",
+        "아키하바라 전자거리 걸다가 우연히",
         "하라주쿠 다케시타도리에서",
-        "시부야 109 근처 돌아다니다가",
+        "시부야 109 근체 돌아다니다가",
     ],
     "교토": [
         "기온 거리 산책하다가 들린 편의점에서",
         "아라시야마 죽림 길 걸은 후 카페에서",
         "니시키 시장 구경하다가",
-        "후시미이나리 다녀온 후 역 근처에서",
+        "후시미이나리 다녀온 후 역 근체에서",
     ],
     "일본": [
         "일본 드럭스토어에서",
         "돈키호테 구경하다가",
-        "마쓰모토키요시 들렀다가",
+        "마씁모토키요시 들렀다가",
         "코코카라파인에서",
         "선드럭 들렀다가",
     ],
 }
 
-# 감정 풀
 EMOTIONS = [
-    "설레는", "여유롭고 느긋한", "새로운 걸 발견한 기쁨",
-    "신나는", "여행 마지막 날 아쉬운", "뭔가 건져야 할 것 같은",
+    "설레는", "여유롭고 느읻한", "새로운 걸 발견한 기쁘",
+    "신나는", "여행 마지막 날 아쉬운", "뛴가 건져야 할 것 같은",
 ]
 
-# 상품 특징 추론 (카테고리 → 일반 특징)
 CATEGORY_FEATURES = {
     "뷰티/스킨케어": ["피부 보습", "일본 현지 인기", "드럭스토어 베스트셀러", "자외선 차단"],
-    "드럭스토어":  ["드럭스토어 인기템", "일본인도 즐겨 쓰는", "마쓰키요 베스트", "가성비 좋은"],
+    "드럭스토어":  ["드럭스토어 인기템", "일본인도 즐겨 쓰는", "마씁키요 베스트", "가성비 좋은"],
     "식품/간식":   ["일본 한정 맛", "현지인도 즐겨 먹는", "일본 여행 하면 꼭", "한국에서 못 사는"],
-    "헤어케어":    ["일본 살롱 추천", "손상 모발 케어", "향이 은은한", "가성비 좋은"],
+    "헤어케어":    ["일본 살롭 추천", "손상 모발 케어", "향이 은은한", "가성비 좋은"],
     "일반상품":    ["일본에서만 파는", "현지 인기 상품", "돈키호테 발견", "가성비 최고"],
 }
 
 
 def product_to_story_packet(product: ProductData) -> StoryPacket:
-    """ProductData를 ContentWriter용 StoryPacket으로 변환"""
     city = product.city or "일본"
     situations = CITY_SITUATIONS.get(city, CITY_SITUATIONS["일본"])
     situation = random.choice(situations)
     emotion   = random.choice(EMOTIONS)
-
-    # 상품명 기반 테마 생성
     name_short = product.product_name[:12].strip()
     city_label = city if city != "일본" else "일본 여행"
     story_theme = f"{city_label} 중 발견한 {name_short}"
-
     features = CATEGORY_FEATURES.get(product.category, CATEGORY_FEATURES["일반상품"])
-
-    # 할인 정보 있으면 특징에 추가
     if product.discount_rate >= 10:
         features = [f"{int(product.discount_rate)}% 할인 중"] + features
-
     return StoryPacket(
         product_id       = product.product_id,
         product_name     = product.product_name,
@@ -180,14 +182,10 @@ def product_to_story_packet(product: ProductData) -> StoryPacket:
         situation        = situation,
         emotion          = emotion,
         story_theme      = story_theme,
-        product_features = features[:4],   # 최대 4개
+        product_features = features[:4],
         price_krw        = product.price if product.price > 0 else None,
     )
 
-
-# ---------------------------------------------------------------------------
-# ContentOutput → PublishPacket 변환
-# ---------------------------------------------------------------------------
 
 def make_publish_packet(
     product: ProductData,
@@ -195,9 +193,6 @@ def make_publish_packet(
     target_time: str,
     generation_attempt: int = 1,
 ) -> PublishPacket:
-    """ContentWriter 결과물을 Make.com 전송용 PublishPacket으로 변환"""
-
-    # FAQ → FAQItem 변환
     faq_items = []
     for faq in content_output.faq_data:
         if isinstance(faq, dict):
@@ -209,7 +204,6 @@ def make_publish_packet(
             continue
         if q and a:
             faq_items.append(FAQItem(question=q, answer=a))
-
     return PublishPacket(
         product_id        = product.product_id,
         store_name        = product.store_name,
@@ -225,10 +219,6 @@ def make_publish_packet(
     )
 
 
-# ---------------------------------------------------------------------------
-# 핵심 발행 함수
-# ---------------------------------------------------------------------------
-
 def run_single(
     product: ProductData,
     target_time: str,
@@ -236,16 +226,8 @@ def run_single(
     connector: MakeConnector,
     dry_run: bool = False,
 ) -> dict:
-    """
-    상품 1개 → 콘텐츠 생성 → 웹훅 전송.
-    반환: {"success": bool, "pipeline_id": str, "error": str}
-    """
     logger.info(f"▶ [{product.store_name}] {product.product_name[:30]} @ {target_time}")
-
-    # 1) StoryPacket 변환
     story = product_to_story_packet(product)
-
-    # 2) 콘텐츠 생성
     try:
         output = writer.generate(story)
         logger.info(f"  콘텐츠 생성 OK — 구조={output.structure_variant} | 톤={output.tone_variant}")
@@ -253,16 +235,11 @@ def run_single(
     except RuntimeError as e:
         logger.error(f"  콘텐츠 생성 실패: {e}")
         return {"success": False, "pipeline_id": "", "error": str(e)}
-
-    # 3) PublishPacket 조립
     packet = make_publish_packet(product, output, target_time)
-
     if dry_run:
-        logger.info(f"  [DRY RUN] 전송 건너뜀. pipeline_id={packet.pipeline_id}")
+        logger.info(f"  [DRY RUN] 전송 건너럜. pipeline_id={packet.pipeline_id}")
         logger.info(f"  [DRY RUN] 전체 본문:\n{output.content}")
         return {"success": True, "pipeline_id": packet.pipeline_id, "error": ""}
-
-    # 4) 전송
     result = connector.send(packet)
     if result["success"]:
         logger.info(f"  ✅ 전송 성공 — HTTP {result['status_code']}")
@@ -273,10 +250,6 @@ def run_single(
                 "error": result["response"]}
 
 
-# ---------------------------------------------------------------------------
-# 일일 실행 메인
-# ---------------------------------------------------------------------------
-
 def run_daily(
     slots: list[str] | None = None,
     store_filter: str | None = None,
@@ -284,15 +257,12 @@ def run_daily(
     dry_run: bool = False,
     limit: int | None = None,
 ) -> None:
-    """
-    하루치 발행 파이프라인 실행.
+    # --slot 미지정 시 현재 KST 시각에 가장 가까운 슬롯 1개 자동 선택
+    if slots is None:
+        detected = detect_current_slot()
+        logger.info(f"슬롯 자동 감지: {detected} (KST 기준)")
+        slots = [detected]
 
-    slots       : 발행 슬롯 목록 (None이면 PUBLISH_SLOTS 전체)
-    store_filter: 특정 스토어만 사용 (None이면 전체)
-    dry_run     : True면 실제 전송 없이 콘텐츠 출력만
-    limit       : 발행 최대 개수 (None이면 슬롯 수)
-    """
-    slots = slots or PUBLISH_SLOTS
     (ROOT / "logs").mkdir(exist_ok=True)
     (ROOT / "state").mkdir(exist_ok=True)
 
@@ -301,42 +271,38 @@ def run_daily(
     logger.info(f"슬롯: {slots} | dry_run={dry_run} | store={store_filter or '전체'}")
     logger.info("=" * 60)
 
-    # ── 1) 상품 수집 ──────────────────────────────────────────
     analyzer = ProductAnalyzer()
-
     if store_filter:
         products = analyzer.fetch_store(store_filter, limit=per_store_fetch)
     else:
         products = analyzer.fetch_all(per_store=per_store_fetch)
-
     if not products:
         logger.error("수집된 상품 없음. 종료.")
         return
 
-    # ── 2) 발행 이력 로드 & 상품 선별 ──────────────────────────
     published_ids = load_published_ids()
     n_needed      = min(len(slots), limit or len(slots))
-
     best = analyzer.pick_best(products, n=n_needed, exclude_ids=published_ids)
-
     if not best:
-        logger.warning("선별된 상품 없음 (이미 오늘 다 발행했거나 조건 미달). 종료.")
+        logger.warning("선별된 상품 없음. 종료.")
         return
-
     logger.info(f"선별 완료: {len(best)}개 상품")
 
-    # ── 3) 모듈 초기화 ────────────────────────────────────────
     writer    = ContentWriter()
     connector = MakeConnector()
 
-    # ── 4) 슬롯 × 상품 매핑 & 발행 ───────────────────────────
     summary = []
     for i, (slot, product) in enumerate(zip(slots, best)):
         logger.info(f"\n[{i+1}/{len(best)}] 슬롯 {slot}")
 
+        # pick_target_time: Buffer에 항상 미래 시각 전달 (KST 기준 5분 이상 앞)
+        safe_time = pick_target_time(slot)
+        if safe_time != slot:
+            logger.info(f"  슬롯 {slot} → 미래 보정: {safe_time}")
+
         result = run_single(
             product     = product,
-            target_time = slot,
+            target_time = safe_time,
             writer      = writer,
             connector   = connector,
             dry_run     = dry_run,
@@ -352,17 +318,14 @@ def run_daily(
             "error":        result.get("error", ""),
         })
 
-        # 성공 시 이력 저장
         if result["success"] and not dry_run:
             save_published_id(product.product_id)
 
-        # 슬롯 간 딜레이 (연속 전송 방지)
         if i < len(best) - 1:
             delay = random.uniform(3.0, 7.0)
             logger.info(f"  다음 발행까지 {delay:.1f}초 대기...")
             time.sleep(delay)
 
-    # ── 5) 실행 요약 ──────────────────────────────────────────
     logger.info("\n" + "=" * 60)
     logger.info("발행 결과 요약")
     logger.info("=" * 60)
@@ -375,7 +338,6 @@ def run_daily(
         )
     logger.info(f"\n성공: {ok_count}/{len(summary)}")
 
-    # ── 6) 요약 JSON 저장 ─────────────────────────────────────
     summary_path = ROOT / "logs" / f"summary_{date.today().isoformat()}.json"
     try:
         existing = json.loads(summary_path.read_text(encoding="utf-8")) if summary_path.exists() else []
@@ -388,10 +350,6 @@ def run_daily(
         logger.warning(f"요약 저장 실패: {e}")
 
 
-# ---------------------------------------------------------------------------
-# CLI 엔트리포인트
-# ---------------------------------------------------------------------------
-
 def parse_args():
     parser = argparse.ArgumentParser(
         description="TrafficAI Engine — 일일 발행 오케스트레이터"
@@ -402,7 +360,7 @@ def parse_args():
     )
     parser.add_argument(
         "--slot", type=str, default=None,
-        help=f"특정 슬롯만 발행 (예: 18:20). 기본값: 전체 슬롯 {PUBLISH_SLOTS}"
+        help="특정 슬롯만 발행 (예: 18:20). 기본값: KST 현재 시각 기준 자동 감지"
     )
     parser.add_argument(
         "--store", type=str, default=None,
@@ -421,13 +379,12 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-
     slots = [args.slot] if args.slot else None
-
     run_daily(
-        slots          = slots,
-        store_filter   = args.store,
+        slots           = slots,
+        store_filter    = args.store,
         per_store_fetch = args.per_store,
-        dry_run        = args.dry_run,
-        limit          = args.limit,
+        dry_run         = args.dry_run,
+        limit           = args.limit,
     )
+
