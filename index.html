@@ -222,7 +222,7 @@
   .pending-title { font-size: 12.5px; font-weight: 700; color: var(--amber); margin-bottom: 3px; line-height: 1.4; }
   .pending-sub { font-size: 11.5px; color: #7A6633; line-height: 1.5; }
 
-  .free-banner { margin-top: 14px; background: var(--green-bg); border-radius: 10px; padding: 12px 14px; font-size: 13px; color: var(--green); font-weight: 600; text-align: center; }
+  .free-banner { margin-top: 14px; background: #F4F6F8; border: 1px solid #E2E8F0; border-radius: 10px; padding: 11px 14px; font-size: 12.5px; color: #5A6573; font-weight: 500; line-height: 1.5; text-align: left; }
 
   /* ---------- MEDICAL TOURISM ---------- */
   .med-disclaimer { background: var(--amber-bg); border: 1px solid #F3DDA0; border-radius: 10px; padding: 14px 16px; font-size: 13px; color: #5C4A1E; line-height: 1.55; margin-bottom: 20px; }
@@ -1051,7 +1051,7 @@ return `<div class="cat-tile free" onclick="openList('free','${city}')" style="$
       bottomBlock = `
         <div class="info-row"><div class="label">Address</div><div class="value">${item.addr}</div></div>
         <div class="info-row"><div class="label">Website</div><div class="value">${item.site}</div></div>
-        <div class="free-banner">Free to visit — no booking required</div>
+        <div class="free-banner">Free to visit — no booking required. Always check current opening hours before you go.</div>
       `;
     } else {
       // verified PAID item — ad-unlock gate
@@ -1063,7 +1063,7 @@ return `<div class="cat-tile free" onclick="openList('free','${city}')" style="$
           <div class="info-row"><div class="label">Address</div><div class="value">${item.addr}</div></div>
           <div class="info-row"><div class="label">Contact</div><div class="value">${item.phone}</div></div>
           <div class="info-row"><div class="label">Website</div><div class="value">${item.site}</div></div>
-          <div class="free-banner">Details confirmed — always free to read here</div>
+          <div class="free-banner">Informational listing — full details, always free to read. Please confirm opening hours and prices with the venue before visiting.</div>
         </div>
       `;
     }
