@@ -1267,12 +1267,12 @@ PAID_ICONS["Theme Park & Water"]="🎢";
       +'<p style="font-size:13px;color:#888;line-height:1.5;">\uD83D\uDEBB Restrooms & \uD83C\uDFEA convenience stores en route, \u2B50 Blue/Red Ribbon & \uD83C\uDFEA\uD83C\uDF7C 100-Year & good-price restaurant ratings, and \uD83D\uDC76 baby facilities (nursing room, stroller rental, high chair, microwave) \u2014 <strong>coming soon</strong>.</p>'
       +'<div style="display:flex;gap:10px;margin-top:12px;">'
       +'<button onclick="window.__KCF_start()" style="flex:1;border:2px solid '+p.color+';background:#fff;color:'+p.color+';border-radius:12px;padding:12px;font-weight:700;cursor:pointer;">\uD83D\uDD04 Try another</button>'
-      +'<button onclick="alert(\'Full AI plan coming soon!\')" style="flex:1;border:none;background:'+p.color+';color:#fff;border-radius:12px;padding:12px;font-weight:700;cursor:pointer;">Unlock Full AI Plan \u00B7 $1.99</button>'
+      +'<button onclick="window.__KCF2_open&&window.__KCF2_open()" style="flex:1;border:none;background:'+p.color+';color:#fff;border-radius:12px;padding:12px;font-weight:700;cursor:pointer;">Unlock Full AI Plan \u00B7 $1.99</button>'
       +'</div></div>';
   }
 
   function generate(key){
-    var p=P[key], city=pick(CITIES);
+    var p=P[key], city=pick(CITIES); window.__KCF_LAST={city:city.n,areaCode:city.code,centerX:null,centerY:null};
     shell("");loading(city,p);
     var proms=p.slots.map(function(s){return slotData(city,s);});
     Promise.all(proms).then(function(res){
@@ -1280,7 +1280,7 @@ PAID_ICONS["Theme Park & Water"]="🎢";
         +'<div style="font-size:13px;color:#999;">Your random city</div>'
         +'<div style="font-size:26px;font-weight:800;color:'+p.color+';">\uD83D\uDCCD '+esc(city.n)+'</div>'
         +'<div style="font-size:14px;color:#666;">'+p.emoji+' '+esc(p.label)+' \u00B7 a full day</div></div>';
-      for(var i=0;i<p.slots.length;i++){ html+=card(p.slots[i],p,res[i]); }
+      for(var i=0;i<p.slots.length;i++){ html+=card(p.slots[i],p,res[i]); if(window.__KCF_LAST&&!window.__KCF_LAST.centerX&&res[i]&&res[i].mapx&&res[i].mapy){window.__KCF_LAST.centerX=res[i].mapx;window.__KCF_LAST.centerY=res[i].mapy;} }
       html+=footer(p);
       document.getElementById("kcf-body").innerHTML=html;
     });
@@ -1291,6 +1291,91 @@ PAID_ICONS["Theme Park & Water"]="🎢";
   window.openTripPlanner=function(){ start(); };
 })();
 /* ===== end KCF ===== */
+
+
+/* ===== KCF2 Paid Plan v1 (added, minimal-change edit) ===== */
+(function(){
+  if(window.__KCF2_LOADED) return; window.__KCF2_LOADED=true;
+  var PROXY="/api/trip.php";
+  function esc(s){return (""+(s==null?"":s)).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+  function api(p){var u=PROXY+"?"+Object.keys(p).map(function(k){return encodeURIComponent(k)+"="+encodeURIComponent(p[k]);}).join("&");return fetch(u).then(function(r){return r.json();}).catch(function(){return null;});}
+  function items(j){try{var b=j.response.body.items.item;return b?(Array.isArray(b)?b:[b]):[];}catch(e){return [];}}
+  function km(d){var n=parseFloat(d); if(isNaN(n))return ""; return n>=1000?(n/1000).toFixed(1)+" km":Math.round(n)+" m";}
+  function searchFB(keyword,areaCode){
+    var first = areaCode?api({action:"search",keyword:keyword,areaCode:areaCode,numOfRows:6,pageNo:1}):Promise.resolve(null);
+    return first.then(function(r){var arr=r?items(r):[];if(arr.length)return arr;return api({action:"search",keyword:keyword,numOfRows:6,pageNo:1}).then(function(r2){return items(r2);});});
+  }
+  function centerFromArea(areaCode){
+    if(!areaCode) return Promise.resolve(null);
+    return api({action:"area",areaCode:areaCode,contentTypeId:76,numOfRows:20,pageNo:1}).then(function(r){
+      var w=items(r).filter(function(x){return x.mapx&&x.mapy;});
+      return w.length?{x:w[0].mapx,y:w[0].mapy}:null;
+    });
+  }
+  function locExpand(mx,my,typeId,radii,idx){
+    idx=idx||0;
+    return api({action:"location",mapX:mx,mapY:my,radius:radii[idx],contentTypeId:typeId,numOfRows:8,pageNo:1}).then(function(j){
+      var arr=items(j);
+      if(arr.length||idx>=radii.length-1) return arr;
+      return locExpand(mx,my,typeId,radii,idx+1);
+    });
+  }
+  function loadingRow(label){ return '<div style="color:#999;font-size:13px;padding:6px 0;">Loading '+label+'\u2026</div>'; }
+  function section(title, icon, color){
+    return '<div style="margin-bottom:18px;">'
+      +'<div style="font-size:14px;font-weight:800;color:'+color+';margin-bottom:8px;">'+icon+' '+esc(title)+'</div>'
+      +'<div data-sec="'+esc(title)+'">'+loadingRow(title)+'</div></div>';
+  }
+  function listHTML(arr, color, withDist){
+    if(!arr.length) return '<div style="color:#aaa;font-size:13px;">No results found.</div>';
+    return arr.slice(0,4).map(function(x){
+      var maps="https://www.google.com/maps/search/?api=1&query="+encodeURIComponent((x.title||"")+" "+(x.addr1||""));
+      return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border:1px solid #f0f0f0;border-radius:10px;margin-bottom:6px;">'
+        +'<div style="min-width:0;"><div style="font-size:14px;font-weight:600;color:#222;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(x.title||"")+'</div>'
+        +(x.addr1?'<div style="font-size:12px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(x.addr1)+'</div>':'')+'</div>'
+        +'<div style="text-align:right;white-space:nowrap;">'+(withDist&&x.dist?'<div style="font-size:12px;color:'+color+';font-weight:700;">'+km(x.dist)+'</div>':'')
+        +'<a href="'+esc(maps)+'" target="_blank" rel="noopener" style="font-size:11px;color:#999;text-decoration:none;">map \u2192</a></div>'
+        +'</div>';
+    }).join("");
+  }
+  function fillSection(name, arr, color, withDist){var el=document.querySelector('[data-sec="'+name+'"]');if(el) el.innerHTML=listHTML(arr,color,withDist);}
+  function comingSoon(){
+    var feats=[["\uD83E\uDDF8","Kids cafes (top-rated)"],["\uD83D\uDE86","Train & subway stations"],["\uD83D\uDEAC","Smoking areas"],["\uD83C\uDF7C","Baby nursing rooms"],["\uD83D\uDC87","Hair salons"],["\u2668\uFE0F","Jjimjilbang (saunas)"],["\uD83D\uDC6E","Police stations"]];
+    return '<div style="border-top:1px dashed #ddd;margin-top:8px;padding-top:14px;">'
+      +'<div style="font-size:13px;font-weight:800;color:#999;margin-bottom:8px;">\u23F3 Coming soon</div>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:6px;">'
+      +feats.map(function(f){return '<span style="font-size:12px;background:#f4f4f6;color:#777;border-radius:20px;padding:5px 10px;">'+f[0]+' '+esc(f[1])+'</span>';}).join("")
+      +'</div></div>';
+  }
+  var RADII=[5000,10000,20000,40000];
+  function fillNearby(mx,my){
+    locExpand(mx,my,80,RADII).then(function(arr){fillSection("Stay (hotels & villas)",arr,"#0066ff",true);});
+    locExpand(mx,my,79,RADII).then(function(arr){fillSection("Big marts & shopping",arr,"#d9822b",true);});
+  }
+  function render(ctx){
+    var cityName=ctx&&ctx.city?ctx.city:"your destination";
+    var body=document.getElementById("kcf-body");
+    if(!body) return;
+    body.innerHTML=
+      '<div style="text-align:center;margin-bottom:16px;">'
+      +'<div style="display:inline-block;background:#e8f0ff;color:#0066ff;font-size:12px;font-weight:800;border-radius:20px;padding:5px 12px;">\u2728 FULL AI PLAN \u00B7 $1.99</div>'
+      +'<div style="font-size:20px;font-weight:800;margin-top:8px;">Everything you need in '+esc(cityName)+'</div>'
+      +'<div style="font-size:13px;color:#888;">Hand-picked nearby spots for your day</div></div>'
+      +section("Stay (hotels & villas)","\uD83C\uDFE8","#0066ff")
+      +section("Big marts & shopping","\uD83D\uDED2","#d9822b")
+      +section("Hospitals nearby","\uD83C\uDFE5","#e0457b")
+      +section("Pharmacies nearby","\uD83D\uDC8A","#2e8b8b")
+      +comingSoon()
+      +'<div style="margin-top:16px;"><button onclick="window.__KCF_start&&window.__KCF_start()" style="width:100%;border:2px solid #0066ff;background:#fff;color:#0066ff;border-radius:12px;padding:12px;font-weight:700;cursor:pointer;">\u2190 Back to itinerary</button></div>';
+    var ac = ctx&&ctx.areaCode?ctx.areaCode:"";
+    if(ctx&&ctx.centerX&&ctx.centerY){ fillNearby(ctx.centerX,ctx.centerY); }
+    else { centerFromArea(ac).then(function(c){ if(c){fillNearby(c.x,c.y);} else {fillSection("Stay (hotels & villas)",[],"#0066ff",true);fillSection("Big marts & shopping",[],"#d9822b",true);} }); }
+    searchFB("hospital",ac).then(function(arr){fillSection("Hospitals nearby",arr,"#e0457b",false);});
+    searchFB("pharmacy",ac).then(function(arr){fillSection("Pharmacies nearby",arr,"#2e8b8b",false);});
+  }
+  window.__KCF2_open=function(){ render(window.__KCF_LAST||null); };
+})();
+/* ===== end KCF2 ===== */
 
 </script>
 
