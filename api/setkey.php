@@ -2,6 +2,7 @@
 // One-time GEMINI_API_KEY setup. DELETE after use.
 header('Content-Type: text/html; charset=utf-8');
 $cfg = __DIR__ . '/config.php';
+$cfgReal = realpath($cfg) ?: $cfg;
 $msg = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $k = isset($_POST['k']) ? trim($_POST['k']) : '';
@@ -18,17 +19,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $ok = @file_put_contents($cfg, $new);
     if ($ok === false) {
-      $msg = 'WRITE FAILED (permissions).';
+      $msg = 'WRITE FAILED (permissions). cfg=' . $cfgReal;
     } else {
       $chk = file_get_contents($cfg);
-      $msg = (strpos($chk, "GEMINI_API_KEY") !== false) ? 'SUCCESS: key saved.' : 'Saved but not found?';
+      $found = strpos($chk, 'GEMINI_API_KEY') !== false;
+      $msg = $found ? 'SUCCESS: key saved. cfg=' . $cfgReal : 'Saved but not found? cfg=' . $cfgReal;
     }
   }
 }
 ?>
 <!doctype html><html><head><meta charset="utf-8"><title>Set Key</title></head>
-<body style="font-family:sans-serif;max-width:480px;margin:40px auto">
+<body style="font-family:sans-serif;max-width:600px;margin:40px auto">
 <h3>Gemini API Key Setup</h3>
+<p style="font-size:12px;color:#666">cfg path: <?php echo htmlspecialchars($cfgReal); ?></p>
 <?php if ($msg) echo '<p style="padding:10px;background:#eef;border:1px solid #99c">'.htmlspecialchars($msg).'</p>'; ?>
 <form method="post">
 <input type="password" name="k" placeholder="Paste Gemini API key" style="width:100%;padding:8px" autocomplete="off">
