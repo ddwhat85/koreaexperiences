@@ -104,6 +104,14 @@ if ($action === 'ai') {
   echo json_encode($parsed); exit;
 }
 
+
+if ($action === 'aicheck') {
+  $defined = defined('GEMINI_API_KEY');
+  $len = $defined ? strlen(GEMINI_API_KEY) : 0;
+  $prefix = $defined ? substr(GEMINI_API_KEY,0,3) : '';
+  echo json_encode(['defined'=>$defined,'length'=>$len,'prefix3'=>$prefix,'config_has_tour'=>defined('TOUR_API_KEY')]); exit;
+}
+
 if (!isset($map[$action])) { http_response_code(400); echo json_encode(['error'=>'bad action']); exit; }
 
 $allow = ['numOfRows','pageNo','areaCode','sigunguCode','contentTypeId',
