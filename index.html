@@ -1321,12 +1321,13 @@ PAID_ICONS["Theme Park & Water"]="🎢";
     return fetch(u).then(function(r){return r.json();}).catch(function(){return null;});
   }
   function isFoodJong(j){ j=j||""; return /한식|양식|중식|일식|요식/.test(j) && !/비요식/.test(j); }
+  function isFoodName(n){ n=(n||"").replace(/[\s]/g,""); var bad=/안경|한복|양복|양장|철물|세탁|미용|이용원|이발|약국|정육|문구|꽃집|화원|사진관|도장|열쇠|시계|귀금속|보석|가구|침구|이불|신발|구두|가방|완구|서점|인쇄|간판|표구|악기|자전거|오토바이|타이어|카센터|공업사|방앛간|이용업|미용업|부동산|세탁소|전자|전기|컴퓨터|핵드폰|휴대폰|통신|가전|조명|페인트|인테리어|자재|상사/; return !bad.test(n); }
   function odcloudFood(city){
     var m=odcloudMap(city.n);
     if(!m) return Promise.resolve([]);
     var pL=odcloudGet({action:"legendary",sido:m.lg,perPage:80}).then(function(j){
       var rows=(j&&j.data)||[];
-      return rows.map(function(x){return {
+      return rows.filter(function(r){return isFoodName(r.title||r["업체명"]||"");}).map(function(x){return {
         title:"🏅 "+(x["업체명"]||""), addr1:(x["업체주소"]||""), tel:(x["연락처"]||""),
         overview:"A government-certified time-honored establishment (100-Year Shop).",
         __intro:{}, __odc:true };});
@@ -1347,6 +1348,7 @@ PAID_ICONS["Theme Park & Water"]="🎢";
     });
   }
 
+  try{ window.__KCF_food = odcloudFood; }catch(e){}
   function slotData(city,slot){
     var isFood=(slot[1]==="type" && slot[2]==="82");
     if(isFood){
@@ -1440,7 +1442,7 @@ PAID_ICONS["Theme Park & Water"]="🎢";
       +'<p style="font-size:12.5px;color:#999;line-height:1.5;">\uD83D\uDEB3 Facilities info (pets/stroller/nursing room) is sourced from Korea Tourism Organization and may not always be available.</p>'
       +'<div style="display:flex;gap:10px;margin-top:12px;">'
       +'<button onclick="window.__KCF_start()" style="flex:1;border:2px solid '+p.color+';background:#fff;color:'+p.color+';border-radius:12px;padding:12px;font-weight:700;cursor:pointer;">\uD83D\uDD04 Try another</button>'
-      +'<button onclick="window.__KCF2_open&&window.__KCF2_open()" style="flex:1;border:none;background:'+p.color+';color:#fff;border-radius:12px;padding:12px;font-weight:700;cursor:pointer;">Unlock Full AI Plan \u00B7 $1.99</button>'
+      +'<button onclick="window.__KCF2_open&&window.__KCF2_open()" style="flex:1;border:none;background:'+p.color+';color:#fff;border-radius:12px;padding:12px;font-weight:700;cursor:pointer;">📍 Extra Spots</button>'
       +'</div></div>';
   }
 
@@ -1574,6 +1576,17 @@ PAID_ICONS["Theme Park & Water"]="🎢";
     else { centerFromArea(ac).then(function(c){ if(c){fillNearby(c.x,c.y);} else {fillSection("Stay (hotels & villas)",[],"#0066ff",true);fillSection("Big marts & shopping",[],"#d9822b",true);} }); }
     searchFB("hospital",ac).then(function(arr){fillSection("Hospitals nearby",arr,"#e0457b",false);});
     searchFB("pharmacy",ac).then(function(arr){fillSection("Pharmacies nearby",arr,"#2e8b8b",false);});
+    searchFB("백화점",ac).then(function(arr){fillSection("Department Stores",arr,"#8e44ad",false);});
+    searchFB("아울렛",ac).then(function(arr){fillSection("Outlets",arr,"#16a085",false);});
+    searchFB("키즈카페",ac).then(function(arr){fillSection("Kids Cafes",arr,"#e67e22",false);});
+    try{ if(window.__KCF_food && ctx && ctx.city){ window.__KCF_food({n:ctx.city}).then(function(food){
+      food=food||[];
+      var leg=food.filter(function(x){return (x.title||"").charAt(0)==="�";}).slice(0,5);
+      var gv=food.filter(function(x){return (x.title||"").charAt(0)==="�";}).slice(0,5);
+      var mapF=function(x){return {title:(x.title||""),addr1:(x.addr1||""),tel:(x.tel||"")};};
+      fillSection("Time-Honored Restaurants (100-Year)",leg.map(mapF),"#c0392b",false);
+      fillSection("Great-Value Eateries",gv.map(mapF),"#27ae60",false);
+    }); } }catch(e){}
   }
   window.__KCF2_open=function(){ render(window.__KCF_LAST||null); };
 })();
@@ -1584,31 +1597,7 @@ PAID_ICONS["Theme Park & Water"]="🎢";
 (function(){
   if(window.__AITG_init) return; window.__AITG_init = true;
   var PRICE = '$1.99';
-  window.aiTripGate = function(){
-    var ex = document.getElementById('aitg-overlay'); if(ex) ex.remove();
-    var ov = document.createElement('div');
-    ov.id = 'aitg-overlay';
-    ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px;';
-    var card = document.createElement('div');
-    card.style.cssText = 'background:#fff;border-radius:18px;max-width:420px;width:100%;padding:26px 22px;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:inherit;text-align:center;';
-    card.innerHTML =
-      '<div style="font-size:34px;margin-bottom:6px;">' + String.fromCodePoint(127922) + String.fromCodePoint(9992,65039) + '</div>'+
-      '<div style="font-size:20px;font-weight:800;color:#111;margin-bottom:6px;">Unlock AI Random Trip</div>'+
-      '<div style="font-size:13.5px;color:#555;line-height:1.5;margin-bottom:18px;">Get a full AI-curated day: a surprise city, persona-based itinerary, and nearby essentials (hotels, marts, hospitals and more).</div>'+
-      '<button id="aitg-pay" style="display:block;width:100%;background:#e63946;color:#fff;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;">Unlock for '+PRICE+'</button>'+
-      '<button id="aitg-ad" style="display:block;width:100%;background:#f1f3f5;color:#222;border:none;border-radius:12px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:14px;">' + String.fromCodePoint(9654) + ' Watch a short ad to unlock free</button>'+
-      '<div id="aitg-cancel" style="font-size:12.5px;color:#999;cursor:pointer;">Maybe later</div>';
-    ov.appendChild(card);
-    document.body.appendChild(ov);
-    function close(){ ov.remove(); }
-    ov.addEventListener('click', function(e){ if(e.target===ov) close(); });
-    card.querySelector('#aitg-cancel').addEventListener('click', close);
-    card.querySelector('#aitg-pay').addEventListener('click', function(){ if(window.Paddle && window.__aitgPaddleReady){ Paddle.Checkout.open({ items:[{ priceId:'pri_01kw9690mp8zpnx1ctye308gww', quantity:1 }], settings:{ displayMode:'overlay', theme:'light' } }); } else { alert('Payment is loading, please try again in a moment.'); } });
-    card.querySelector('#aitg-ad').addEventListener('click', function(){
-      var b = card.querySelector('#aitg-ad'); b.disabled = true; var n=3; b.textContent='Ad... '+n+'s';
-      var t = setInterval(function(){ n--; if(n<=0){ clearInterval(t); close(); if(typeof window.openTripPlanner==='function') window.openTripPlanner(); } else { b.textContent='Ad... '+n+'s'; } },1000);
-    });
-  };
+  window.aiTripGate = function(){ try{ if(typeof window.openTripPlanner==="function"){ window.openTripPlanner(); } }catch(e){} };
 })();
 
 </script>
