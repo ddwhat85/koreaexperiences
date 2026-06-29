@@ -2,28 +2,40 @@
 // One-time GEMINI_API_KEY setup. DELETE after use.
 header('Content-Type: text/html; charset=utf-8');
 $cfg = __DIR__ . '/config.php';
-$cfgReal = realpath($cfg) ?: $cfg;
 $msg = '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $k = isset($_POST['k']) ? trim($_POST['k']) : '';
   if ($k === '') {
     $msg = 'Empty key.';
   } else {
-    $esc = str_replace(array('\\', "'"), array('\\\\', "\\'"), $k);
-    $line = "define('GEMINI_API_KEY', '" . $esc . "');";
-    $cur = file_exists($cfg) ? file_get_contents($cfg) : "<?php\n";
-    if (strpos($cur, 'GEMINI_API_KEY') !== false) {
-      $new = preg_replace("/define\\(\\s*'GEMINI_API_KEY'.*?\\);/s", $line, $cur);
-    } else {
-      $new = rtrim($cur) . "\n" . $line . "\n";
+    // Read existing config to preserve TOUR_API_KEY
+    $tourKey = '';
+    if (file_exists($cfg)) {
+      $old = file_get_contents($cfg);
+      // Try to extract TOUR_API_KEY value
+      if (preg_match("/define\\s*\\(\\s*'TOUR_API_KEY'\\s*,\\s*'([^']*)'\\s*\\)/", $old, $m)) {
+        $tourKey = $m[1];
+      }
     }
+    // Escape the new gemini key
+    $esc = str_replace(array('\\', "'"), array('\\\\', "\\'"), $k);
+    // Rebuild config.php cleanly
+    $new = "<?php\n";
+    if ($tourKey !== '') {
+      $tourEsc = str_replace(array('\\', "'"), array('\\\\', "\\'"), $tourKey);
+      $new .= "define('TOUR_API_KEY', '" . $tourEsc . "');\n";
+    }
+    $new .= "define('GEMINI_API_KEY', '" . $esc . "');\n";
     $ok = @file_put_contents($cfg, $new);
     if ($ok === false) {
-      $msg = 'WRITE FAILED (permissions). cfg=' . $cfgReal;
+      $msg = 'WRITE FAILED.';
     } else {
-      $chk = file_get_contents($cfg);
-      $found = strpos($chk, 'GEMINI_API_KEY') !== false;
-      $msg = $found ? 'SUCCESS: key saved. cfg=' . $cfgReal : 'Saved but not found? cfg=' . $cfgReal;
+      // Verify: include in isolated scope
+      $content = file_get_contents($cfg);
+      $hasGemini = strpos($content, 'GEMINI_API_KEY') !== false;
+      $hasTour   = strpos($content, 'TOUR_API_KEY') !== false;
+      $msg = $hasGemini ? ('SUCCESS: saved. tour=' . ($hasTour?'yes':'missing!')) : 'Saved but verify failed.';
     }
   }
 }
@@ -31,7 +43,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <!doctype html><html><head><meta charset="utf-8"><title>Set Key</title></head>
 <body style="font-family:sans-serif;max-width:600px;margin:40px auto">
 <h3>Gemini API Key Setup</h3>
-<p style="font-size:12px;color:#666">cfg path: <?php echo htmlspecialchars($cfgReal); ?></p>
 <?php if ($msg) echo '<p style="padding:10px;background:#eef;border:1px solid #99c">'.htmlspecialchars($msg).'</p>'; ?>
 <form method="post">
 <input type="password" name="k" placeholder="Paste Gemini API key" style="width:100%;padding:8px" autocomplete="off">
