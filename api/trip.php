@@ -83,7 +83,7 @@ if ($action === 'ai') {
     ."RULES:\n"
     ."- Write everything in ENGLISH.\n"
     ."- enName: a natural English name for the place. Keep it accurate; do not invent a brand that does not exist.\n"
-    ."- category: the real type in 1-2 English words (e.g. Restaurant, Cafe, Traditional Market, Garden, Museum, Temple, Park). If it is an eatery, use Restaurant/Cafe, NOT 'shop'.\n"
+    ."- category: the real type in 1-2 English words (e.g. Restaurant, Cafe, Traditional Market, Garden, Museum, Temple, Park). If it is an eatery, use Restaurant/Cafe, NOT 'shop'. When unsure of an eatery subtype, default to Restaurant; do NOT guess Cafe, Tea House, Bar or Bakery from the name alone unless the name or data clearly shows it.\n"
     ."- blurb: 1-2 honest English sentences about what the place actually is and why it suits the persona. Do NOT exaggerate or call something a hotspot if it is not.\n"
     ."- menu: up to 3 likely signature items for eateries as objects {name, price}. price is an APPROXIMATE range in KRW and MUST start with 'approx. ' (e.g. 'approx. 12,000-18,000 KRW'). If you are not confident, set menu to an empty array rather than inventing specifics.\n"
     ."- Never fabricate opening hours, phone numbers or ratings.\n\n"
