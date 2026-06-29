@@ -75,7 +75,7 @@ if ($action === 'ai') {
     }
   }
   $prompt = "You are a Korea travel planner. Persona: $persona.\n\n$slotsTxt\nFor each slot, pick the best option for this persona. Reply ONLY with a JSON array (no markdown), one object per slot: [{\"slot\":1,\"pick\":1,\"blurb\":\"2-sentence English description\"}]";
-  $gemUrl  = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='.GEMINI_API_KEY;
+  $gemUrl  = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key='.GEMINI_API_KEY;
   $gemBody = json_encode(['contents'=>[['parts'=>[['text'=>$prompt]]]]]);
   $ch = curl_init($gemUrl);
   curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_POST=>true,
