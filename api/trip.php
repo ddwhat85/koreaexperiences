@@ -90,7 +90,7 @@ if ($action === 'ai') {
   $text = trim(preg_replace('/^```(?:json)?/m','',preg_replace('/```$/m','',$text)));
   $picks = json_decode($text, true);
   if (!$picks || !is_array($picks)) {
-    echo json_encode(['error'=>'ai_parse','raw'=>substr($text,0,300)]); exit;
+    echo json_encode(['error'=>'ai_parse','text'=>substr($text,0,300),'gemRaw'=>substr($raw,0,800)]); exit;
   }
   echo json_encode(['results'=>$picks]); exit;
 }
