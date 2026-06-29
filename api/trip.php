@@ -77,9 +77,14 @@ if ($action === 'ai') {
   $prompt = "You are a Korea travel planner. Persona: $persona.\n\n$slotsTxt\nFor each slot, pick the best option for this persona. Reply ONLY with a JSON array (no markdown), one object per slot: [{\"slot\":1,\"pick\":1,\"blurb\":\"2-sentence English description\"}]";
   $gemUrl  = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='.GEMINI_API_KEY;
   $gemBody = json_encode(['contents'=>[['parts'=>[['text'=>$prompt]]]]]);
-  $ctx = stream_context_create(['http'=>['method'=>'POST','header'=>'Content-Type: application/json','content'=>$gemBody,'timeout'=>15]]);
-  $raw = @file_get_contents($gemUrl, false, $ctx);
-  if ($raw === false) { http_response_code(502); echo json_encode(['error'=>'ai_error']); exit; }
+  $ch = curl_init($gemUrl);
+  curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_POST=>true,
+    CURLOPT_POSTFIELDS=>$gemBody, CURLOPT_HTTPHEADER=>['Content-Type: application/json'],
+    CURLOPT_TIMEOUT=>15, CURLOPT_SSL_VERIFYPEER=>true]);
+  $raw = curl_exec($ch);
+  $curlErr = curl_error($ch);
+  curl_close($ch);
+  if ($raw === false || $raw === '') { http_response_code(502); echo json_encode(['error'=>'ai_error','curl'=>$curlErr]); exit; }
   $resp = json_decode($raw, true);
   $text = $resp['candidates'][0]['content']['parts'][0]['text'] ?? '';
   $text = trim(preg_replace('/^```(?:json)?/m','',preg_replace('/```$/m','',$text)));
