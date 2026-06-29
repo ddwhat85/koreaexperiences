@@ -1178,6 +1178,120 @@ PAID_ICONS["Theme Park & Water"]="🎢";
 
   renderHub();
   renderMedical();
+
+/* ===== KCF Persona Trip Generator (added, minimal-change edit) ===== */
+(function(){
+  if(window.__KCF_LOADED) return; window.__KCF_LOADED=true;
+  var PROXY="/api/trip.php";
+  var CITIES=[{n:"Seoul",code:1},{n:"Busan",code:6},{n:"Jeju",code:39},{n:"Gyeongju",code:35},{n:"Jeonju",code:37},{n:"Incheon",code:2}];
+  var P={
+    couple:{label:"Couple / Romantic",emoji:"\uD83D\uDC95",color:"#e0457b",slots:[["Morning","cat1","A01"],["Lunch","type","82"],["Afternoon","cat1","A02"],["Evening","cat1","A05"]]},
+    family:{label:"Family with Kids",emoji:"\uD83D\uDC6A",color:"#ff7a59",slots:[["Morning","cat1","A03"],["Lunch","type","82"],["Afternoon","cat1","A01"],["Evening","cat1","A05"]]},
+    foodie:{label:"Foodie",emoji:"\uD83C\uDF5C",color:"#d9822b",slots:[["Morning","cat1","A02"],["Lunch","type","82"],["Afternoon","cat1","A04"],["Evening","type","82"]]},
+    girls:{label:"Girls' Trip",emoji:"\uD83D\uDC6F",color:"#9b59b6",slots:[["Morning","cat1","A02"],["Lunch","type","82"],["Afternoon","cat1","A04"],["Evening","cat1","A05"]]},
+    parents:{label:"With Parents",emoji:"\uD83E\uDDD3",color:"#2e8b8b",slots:[["Morning","cat1","A02"],["Lunch","type","82"],["Afternoon","cat1","A01"],["Evening","cat1","A05"]]}
+  };
+  function esc(s){return (""+(s==null?"":s)).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+  function api(p){var u=PROXY+"?"+Object.keys(p).map(function(k){return encodeURIComponent(k)+"="+encodeURIComponent(p[k]);}).join("&");return fetch(u).then(function(r){return r.json();}).catch(function(){return null;});}
+  function items(j){try{var b=j.response.body.items.item;return b?(Array.isArray(b)?b:[b]):[];}catch(e){return [];}}
+  function pick(arr){return arr[Math.floor(Math.random()*arr.length)];}
+
+  function overlay(){
+    var o=document.getElementById("kcf-overlay");
+    if(o) return o;
+    o=document.createElement("div");o.id="kcf-overlay";
+    o.style.cssText="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.6);overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:24px 12px;";
+    o.addEventListener("click",function(e){if(e.target===o)close();});
+    document.body.appendChild(o);return o;
+  }
+  function close(){var o=document.getElementById("kcf-overlay");if(o)o.remove();}
+  window.__KCF_close=close;
+
+  function shell(inner){
+    var o=overlay();
+    o.innerHTML='<div style="background:#fff;border-radius:18px;max-width:680px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #eee;">'
+      +'<strong style="font-size:18px;">\uD83C\uDDF0\uD83C\uDDF7 Build My Korea Trip</strong>'
+      +'<button onclick="window.__KCF_close()" style="border:none;background:#f1f1f1;border-radius:50%;width:32px;height:32px;cursor:pointer;font-size:16px;">\u00D7</button>'
+      +'</div><div id="kcf-body" style="padding:20px;">'+inner+'</div></div>';
+  }
+
+  function chooser(){
+    var btns=Object.keys(P).map(function(key){var p=P[key];
+      return '<button data-k="'+key+'" class="kcf-pbtn" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:2px solid #eee;background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;cursor:pointer;font-size:16px;font-weight:600;color:#333;">'
+        +'<span style="font-size:24px;">'+p.emoji+'</span><span>'+esc(p.label)+'</span></button>';
+    }).join("");
+    shell('<p style="margin:0 0 16px;color:#555;">Who are you travelling with? Pick a vibe and we\u2019ll craft a full random-city day for you.</p>'+btns);
+    Array.prototype.forEach.call(document.querySelectorAll(".kcf-pbtn"),function(b){
+      b.addEventListener("mouseenter",function(){b.style.borderColor=P[b.dataset.k].color;});
+      b.addEventListener("mouseleave",function(){b.style.borderColor="#eee";});
+      b.addEventListener("click",function(){generate(b.dataset.k);});
+    });
+  }
+
+  function loading(city,p){
+    document.getElementById("kcf-body").innerHTML=
+      '<div style="text-align:center;padding:30px 0;">'
+      +'<div style="font-size:40px;margin-bottom:8px;">'+p.emoji+'</div>'
+      +'<div style="font-size:22px;font-weight:700;color:'+p.color+';">\uD83D\uDCCD '+esc(city.n)+'</div>'
+      +'<p style="color:#777;margin-top:8px;">Crafting your '+esc(p.label)+' day in '+esc(city.n)+'\u2026</p>'
+      +'<div class="kcf-spin" style="margin:18px auto;width:34px;height:34px;border:4px solid #eee;border-top-color:'+p.color+';border-radius:50%;animation:kcfspin 1s linear infinite;"></div>'
+      +'</div><style>@keyframes kcfspin{to{transform:rotate(360deg)}}</style>';
+  }
+
+  function slotData(city,slot){
+    var params={action:"area",areaCode:city.code,numOfRows:30,pageNo:1,arrange:"O"};
+    if(slot[1]==="cat1") params.cat1=slot[2]; else params.contentTypeId=slot[2];
+    return api(params).then(function(j){var list=items(j);return list.length?pick(list):null;});
+  }
+
+  function card(slot,p,it){
+    if(!it) return '<div style="padding:14px;border:1px dashed #ddd;border-radius:12px;margin-bottom:14px;color:#999;">'+slot[0]+': no spot found \u2014 try again.</div>';
+    var img=it.firstimage||it.firstimage2||"";
+    var title=esc(it.title), addr=esc(it.addr1||"");
+    var ov=esc((it.overview||"").replace(/<[^>]+>/g,"").slice(0,160));
+    var maps="https://www.google.com/maps/search/?api=1&query="+encodeURIComponent((it.title||"")+" "+(it.addr1||""));
+    return '<div style="border:1px solid #eee;border-radius:14px;overflow:hidden;margin-bottom:16px;">'
+      +(img?'<img src="'+esc(img)+'" style="width:100%;height:170px;object-fit:cover;" loading="lazy">':'')
+      +'<div style="padding:14px 16px;">'
+      +'<div style="font-size:12px;font-weight:700;letter-spacing:.5px;color:'+p.color+';text-transform:uppercase;">'+slot[0]+'</div>'
+      +'<div style="font-size:18px;font-weight:700;margin:2px 0 6px;">'+title+'</div>'
+      +(addr?'<div style="font-size:13px;color:#777;margin-bottom:6px;">\uD83D\uDCCD '+addr+'</div>':'')
+      +(ov?'<p style="font-size:14px;color:#444;line-height:1.5;margin:0 0 10px;">'+ov+'\u2026</p>':'')
+      +'<a href="'+esc(maps)+'" target="_blank" rel="noopener" style="display:inline-block;font-size:13px;font-weight:600;color:'+p.color+';text-decoration:none;">\uD83D\uDDFA\uFE0F Open in Google Maps \u2192</a>'
+      +'</div></div>';
+  }
+
+  function footer(p){
+    return '<div style="border-top:1px solid #eee;margin-top:6px;padding-top:16px;">'
+      +'<p style="font-size:13px;color:#888;line-height:1.5;">\uD83D\uDEBB Restrooms & \uD83C\uDFEA convenience stores en route, \u2B50 Blue/Red Ribbon & \uD83C\uDFEA\uD83C\uDF7C 100-Year & good-price restaurant ratings, and \uD83D\uDC76 baby facilities (nursing room, stroller rental, high chair, microwave) \u2014 <strong>coming soon</strong>.</p>'
+      +'<div style="display:flex;gap:10px;margin-top:12px;">'
+      +'<button onclick="window.__KCF_start()" style="flex:1;border:2px solid '+p.color+';background:#fff;color:'+p.color+';border-radius:12px;padding:12px;font-weight:700;cursor:pointer;">\uD83D\uDD04 Try another</button>'
+      +'<button onclick="alert(\'Full AI plan coming soon!\')" style="flex:1;border:none;background:'+p.color+';color:#fff;border-radius:12px;padding:12px;font-weight:700;cursor:pointer;">Unlock Full AI Plan \u00B7 $1.99</button>'
+      +'</div></div>';
+  }
+
+  function generate(key){
+    var p=P[key], city=pick(CITIES);
+    shell("");loading(city,p);
+    var proms=p.slots.map(function(s){return slotData(city,s);});
+    Promise.all(proms).then(function(res){
+      var html='<div style="text-align:center;margin-bottom:18px;">'
+        +'<div style="font-size:13px;color:#999;">Your random city</div>'
+        +'<div style="font-size:26px;font-weight:800;color:'+p.color+';">\uD83D\uDCCD '+esc(city.n)+'</div>'
+        +'<div style="font-size:14px;color:#666;">'+p.emoji+' '+esc(p.label)+' \u00B7 a full day</div></div>';
+      for(var i=0;i<p.slots.length;i++){ html+=card(p.slots[i],p,res[i]); }
+      html+=footer(p);
+      document.getElementById("kcf-body").innerHTML=html;
+    });
+  }
+
+  function start(){ chooser(); }
+  window.__KCF_start=start;
+  window.openTripPlanner=function(){ start(); };
+})();
+/* ===== end KCF ===== */
+
 </script>
 
 </body>
