@@ -1544,7 +1544,7 @@ PAID_ICONS["Theme Park & Water"]="🎢";
   }
   function fillSection(name, arr, color, withDist){var el=document.querySelector('[data-sec="'+name+'"]');if(el) el.innerHTML=listHTML(arr,color,withDist);}
   function comingSoon(){
-    var feats=[["\uD83E\uDDF8","Kids cafes (top-rated)"],["\uD83D\uDE86","Train & subway stations"],["\uD83D\uDEAC","Smoking areas"],["\uD83C\uDF7C","Baby nursing rooms"],["\uD83D\uDC87","Hair salons"],["\u2668\uFE0F","Jjimjilbang (saunas)"],["\uD83D\uDC6E","Police stations"]];
+    var feats=[["\uD83D\uDE86","Train & subway stations"],["\uD83D\uDEAC","Smoking areas"],["\uD83C\uDF7C","Baby nursing rooms"],["\uD83D\uDC87","Hair salons"],["\u2668\uFE0F","Jjimjilbang (saunas)"],["\uD83D\uDC6E","Police stations"]];
     return '<div style="border-top:1px dashed #ddd;margin-top:8px;padding-top:14px;">'
       +'<div style="font-size:13px;font-weight:800;color:#999;margin-bottom:8px;">\u23F3 Coming soon</div>'
       +'<div style="display:flex;flex-wrap:wrap;gap:6px;">'
@@ -1569,6 +1569,11 @@ PAID_ICONS["Theme Park & Water"]="🎢";
       +section("Big marts & shopping","\uD83D\uDED2","#d9822b")
       +section("Hospitals nearby","\uD83C\uDFE5","#e0457b")
       +section("Pharmacies nearby","\uD83D\uDC8A","#2e8b8b")
+      +section("Department Stores","\uD83C\uDFEC","#8e44ad")
+      +section("Outlets","\uD83D\uDECD\uFE0F","#16a085")
+      +section("Kids Cafes","\uD83E\uDDF8","#e67e22")
+      +section("Time-Honored Restaurants (100-Year)","\uD83C\uDFC5","#c0392b")
+      +section("Great-Value Eateries","\uD83D\uDCB0","#27ae60")
       +comingSoon()
       +'<div style="margin-top:16px;"><button onclick="window.__KCF_start&&window.__KCF_start()" style="width:100%;border:2px solid #0066ff;background:#fff;color:#0066ff;border-radius:12px;padding:12px;font-weight:700;cursor:pointer;">\u2190 Back to itinerary</button></div>';
     var ac = ctx&&ctx.areaCode?ctx.areaCode:"";
@@ -1581,8 +1586,8 @@ PAID_ICONS["Theme Park & Water"]="🎢";
     searchFB("키즈카페",ac).then(function(arr){fillSection("Kids Cafes",arr,"#e67e22",false);});
     try{ if(window.__KCF_food && ctx && ctx.city){ window.__KCF_food({n:ctx.city}).then(function(food){
       food=food||[];
-      var leg=food.filter(function(x){return (x.title||"").charAt(0)==="�";}).slice(0,5);
-      var gv=food.filter(function(x){return (x.title||"").charAt(0)==="�";}).slice(0,5);
+      var leg=food.filter(function(x){return (x.title||"").codePointAt(0)===0x1F3C5;}).slice(0,5);
+      var gv=food.filter(function(x){return (x.title||"").codePointAt(0)===0x1F4B0;}).slice(0,5);
       var mapF=function(x){return {title:(x.title||""),addr1:(x.addr1||""),tel:(x.tel||"")};};
       fillSection("Time-Honored Restaurants (100-Year)",leg.map(mapF),"#c0392b",false);
       fillSection("Great-Value Eateries",gv.map(mapF),"#27ae60",false);
