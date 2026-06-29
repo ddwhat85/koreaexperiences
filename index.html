@@ -1296,7 +1296,60 @@ PAID_ICONS["Theme Park & Water"]="ð¢";
       +'</div><style>@keyframes kcfspin{to{transform:rotate(360deg)}}</style>';
   }
 
+  function odcloudMap(cityName){
+    var M={
+      "Seoul":{gfSido:"서울특별시",gfSigun:"",lg:"서울"},
+      "Busan":{gfSido:"부산광역시",gfSigun:"",lg:"부산"},
+      "Jeju":{gfSido:"제주특별자치도",gfSigun:"",lg:"제주"},
+      "Gyeongju":{gfSido:"경상북도",gfSigun:"경주시",lg:"경주"},
+      "Jeonju":{gfSido:"전북특별자치도",gfSigun:"전주시",lg:"전주"},
+      "Incheon":{gfSido:"인천광역시",gfSigun:"",lg:"인천"}
+    };
+    return M[cityName]||null;
+  }
+  function odcloudGet(params){
+    var u=PROXY+"?"+Object.keys(params).map(function(k){return encodeURIComponent(k)+"="+encodeURIComponent(params[k]);}).join("&");
+    return fetch(u).then(function(r){return r.json();}).catch(function(){return null;});
+  }
+  function isFoodJong(j){ j=j||""; return /한식|양식|중식|일식|요식/.test(j) && !/비요식/.test(j); }
+  function odcloudFood(city){
+    var m=odcloudMap(city.n);
+    if(!m) return Promise.resolve([]);
+    var pL=odcloudGet({action:"legendary",sido:m.lg,perPage:80}).then(function(j){
+      var rows=(j&&j.data)||[];
+      return rows.map(function(x){return {
+        title:"🏅 "+(x["업체명"]||""), addr1:(x["업체주소"]||""), tel:(x["연락처"]||""),
+        overview:"백년가게 — 소상공인시장진흥공단이 지정한 검증된 명가입니다.",
+        __intro:{}, __odc:true };});
+    });
+    var pG=odcloudGet({action:"goodfood",sido:m.gfSido,sigun:m.gfSigun,perPage:100}).then(function(j){
+      var rows=((j&&j.data)||[]).filter(function(x){return isFoodJong(x["업종"]);});
+      return rows.map(function(x){
+        var menu=x["메띙1"]?(" — "+x["메띙1"]+(x["가격1"]?(" "+x["가격1"]+"원"):"")):"";
+        return {
+          title:"💰 "+(x["업소명"]||""), addr1:(x["주소"]||""), tel:(x["연락처"]||""),
+          overview:"착한가격업소 — 행정안전부 지정 가성비 맛집"+menu+".",
+          __intro:{}, __odc:true };});
+    });
+    return Promise.all([pL,pG]).then(function(a){
+      if(a[0].length) return a[0];
+      if(a[1].length) return a[1];
+      return [];
+    });
+  }
+
   function slotData(city,slot){
+    var isFood=(slot[1]==="type" && slot[2]==="82");
+    if(isFood){
+      return odcloudFood(city).then(function(pool){
+        if(pool && pool.length){ var it=pick(pool); if(it) return it; }
+        return slotDataTour(city,slot);
+      }).catch(function(){ return slotDataTour(city,slot); });
+    }
+    return slotDataTour(city,slot);
+  }
+
+  function slotDataTour(city,slot){
     var params={action:"area",areaCode:city.code,numOfRows:30,pageNo:1,arrange:"O"};
     if(slot[1]==="cat1") params.cat1=slot[2]; else params.contentTypeId=slot[2];
     return api(params).then(function(j){
