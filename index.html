@@ -1385,10 +1385,25 @@ PAID_ICONS["Theme Park & Water"]="🎢";
   }
 
   function card(slot,p,it){
+    var __ai = (it && it.__ai) || {};
+    var aiCat = __ai.category ? esc(__ai.category) : '';
+    var aiMenu = '';
+    if (__ai.menu && __ai.menu.length){
+      aiMenu = '<div style="margin:8px 0 4px;">'
+        + '<div style="font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;">Signature menu <span style="font-weight:400;text-transform:none;">(estimated)</span></div>';
+      for (var mi=0; mi<__ai.menu.length; mi++){
+        var mm = __ai.menu[mi] || {};
+        aiMenu += '<div style="display:flex;justify-content:space-between;font-size:13px;color:#444;padding:2px 0;border-bottom:1px solid #f0f0f0;">'
+          + '<span>' + esc(mm.name||'') + '</span>'
+          + '<span style="color:#777;white-space:nowrap;padding-left:10px;">' + esc(mm.price||'') + '</span>'
+          + '</div>';
+      }
+      aiMenu += '</div>';
+    }
     if(!it) return '<div style="padding:14px;border:1px dashed #ddd;border-radius:12px;margin-bottom:14px;color:#999;">'+slot[0]+': no spot found \u2014 try again.</div>';
     var img=it.firstimage||it.firstimage2||"";
-    var title=esc(it.title||""), addr=esc(it.addr1||""), tel=esc((it.tel||"").replace(/<[^>]+>/g,"").trim());
-    var ov=esc((it.overview||"").replace(/<[^>]+>/g,"").replace(/\s+/g," ").trim().substring(0,220));
+    var title=(__ai.enName ? esc(__ai.enName)+(it.title? ' <span style="color:#9aa;font-weight:400;font-size:.8em;">('+esc(it.title)+')</span>':'') : esc(it.title||"")), addr=esc(it.addr1||""), tel=esc((it.tel||"").replace(/<[^>]+>/g,"").trim());
+    var ov=__ai.blurb ? esc(__ai.blurb) : esc((it.overview||"").replace(/<[^>]+>/g,"").replace(/\s+/g," ").trim().substring(0,220));
     var maps="https://www.google.com/maps/search/?api=1&query="+encodeURIComponent((it.title||"")+" "+(it.addr1||""));
     var intro=it.__intro||{};
     var phone=tel||(intro.infocenter||intro.infocenterfood||intro.infocenterlefacility||"").replace(/<[^>]+>/g,"").replace(/\s+/g," ").trim().substring(0,60);
@@ -1407,7 +1422,9 @@ PAID_ICONS["Theme Park & Water"]="🎢";
       +(addr?'<div style="font-size:13px;color:#555;margin-bottom:3px;display:flex;align-items:flex-start;gap:4px;"><span>\uD83D\uDCCD</span><span>'+addr+'</span></div>':'')
       +(phone?'<div style="font-size:13px;color:#555;margin-bottom:3px;">\uD83D\uDCDE '+esc(phone)+'</div>':'')
       +''
+      +(aiCat?'<div style="display:inline-block;font-size:11px;font-weight:700;color:#0066FF;background:#eef4ff;padding:2px 8px;border-radius:10px;margin:2px 0 6px;">'+aiCat+'</div>':'')
       +(ov?'<p style="font-size:13.5px;color:#444;line-height:1.6;margin:8px 0 6px;">'+ov+'</p>':'')
+      +aiMenu
       +''
       +'<div style="margin:8px 0 4px;display:flex;flex-wrap:wrap;">'
       +facBadge("Pets",pet,"\uD83D\uDC36")
@@ -1432,16 +1449,42 @@ PAID_ICONS["Theme Park & Water"]="🎢";
     shell(""); loading(city,p);
     var proms=p.slots.map(function(s){return slotData(city,s);});
     Promise.all(proms).then(function(res){
-      var html='<div style="text-align:center;margin-bottom:18px;">'
-        +'<div style="font-size:13px;color:#999;">Your random city</div>'
-        +'<div style="font-size:26px;font-weight:800;color:'+p.color+';">\uD83D\uDCCD '+esc(city.n)+'</div>'
-        +'<div style="font-size:14px;color:#666;">'+p.emoji+' '+esc(p.label)+' \u00B7 a full day</div></div>';
+      // Build AI request: one slot per place, ask AI for English name/category/blurb/menu + persona fit
+      var aiSlots=[];
       for(var i=0;i<p.slots.length;i++){
-        html+=card(p.slots[i],p,res[i]);
-        if(window.__KCF_LAST&&!window.__KCF_LAST.centerX&&res[i]&&res[i].mapx&&res[i].mapy){window.__KCF_LAST.centerX=res[i].mapx;window.__KCF_LAST.centerY=res[i].mapy;}
+        var it=res[i]||{};
+        var kind = (p.slots[i] && p.slots[i][2]==='82') ? 'restaurant' : (p.slots[i]?p.slots[i][1]+':'+p.slots[i][2]:'');
+        aiSlots.push({ label:(p.slots[i]&&p.slots[i][0])||('Slot '+(i+1)),
+          candidates:[{ title:(it.title||''), addr:(it.addr1||''), kind:kind }] });
       }
-      html+=footer(p);
-      document.getElementById("kcf-body").innerHTML=html;
+      function render(){
+        var html='';
+        for(var i=0;i<p.slots.length;i++){
+          var it=res[i];
+          html+=card(p.slots[i],p,it);
+          if(it && it.mapx && it.mapy){ window.__KCF_LAST.centerX=it.mapx; window.__KCF_LAST.centerY=it.mapy; }
+        }
+        html+=footer(p);
+        document.getElementById("kcf-body").innerHTML=html;
+      }
+      var ctrl = (typeof AbortController!=='undefined') ? new AbortController() : null;
+      var killed=false;
+      var timer=setTimeout(function(){ killed=true; if(ctrl) ctrl.abort(); render(); }, 22000);
+      fetch('/api/trip.php?action=ai',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({persona:(p.name||p.label||key), slots:aiSlots}), signal: ctrl?ctrl.signal:undefined})
+        .then(function(r){return r.json();})
+        .then(function(d){
+          if(killed) return;
+          clearTimeout(timer);
+          if(d && d.results && d.results.length){
+            for(var k=0;k<d.results.length;k++){
+              var rr=d.results[k]; var si=(rr.slot||k+1)-1;
+              if(res[si]){ res[si].__ai={enName:rr.enName,category:rr.category,blurb:rr.blurb,menu:rr.menu||[]}; }
+            }
+          }
+          render();
+        })
+        .catch(function(){ if(killed) return; clearTimeout(timer); render(); });
     });
   }
 
