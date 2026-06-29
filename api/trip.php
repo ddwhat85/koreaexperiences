@@ -57,53 +57,38 @@ if ($action === 'legendary') {
 
 
 if ($action === 'ai') {
-  $GEMINI_KEY = defined('GEMINI_API_KEY') ? GEMINI_API_KEY : '';
-  if (!$GEMINI_KEY) { http_response_code(503); echo json_encode(['error'=>'ai_unconfigured']); exit; }
-  $raw = file_get_contents('php://input');
-  $in = json_decode($raw, true);
-  if (!$in || empty($in['slots'])) { http_response_code(400); echo json_encode(['error'=>'bad_input']); exit; }
-  $persona = isset($in['persona']) ? substr(preg_replace('/[^A-Za-z0-9 \/]/','',$in['persona']),0,60) : 'traveler';
+  if (!defined('GEMINI_API_KEY')) { http_response_code(503); echo json_encode(['error'=>'ai_unconfigured']); exit; }
+  $body = json_decode(file_get_contents('php://input'), true);
+  if (!$body || !isset($body['persona']) || !isset($body['slots']) || !is_array($body['slots'])) {
+    http_response_code(400); echo json_encode(['error'=>'bad_input']); exit;
+  }
+  $persona  = $body['persona'];
+  $slots    = $body['slots'];
   $slotsTxt = '';
-  foreach ($in['slots'] as $si => $slot) {
-    $label = isset($slot['label']) ? $slot['label'] : ('Slot'.$si);
-    $slotsTxt .= "\nSLOT ".$si." (".$label."):";
-    if (!empty($slot['candidates'])) {
-      foreach ($slot['candidates'] as $c) {
-        $idx = isset($c['i']) ? intval($c['i']) : 0;
-        $nm = isset($c['name']) ? $c['name'] : '';
-        $ct = isset($c['cat']) ? $c['cat'] : '';
-        $slotsTxt .= "\n  [".$idx."] ".$nm.($ct?(" — ".$ct):"");
-      }
+  foreach ($slots as $si => $slot) {
+    $label = $slot['label'] ?? 'Slot '.($si+1);
+    $cands = $slot['candidates'] ?? [];
+    $slotsTxt .= "Slot ".($si+1).": $label\n";
+    foreach ($cands as $idx => $c) {
+      $t = $c['title'] ?? '';
+      $slotsTxt .= "  Option ".($idx+1).": $t\n";
     }
   }
-  $sys = "You are a Korea travel curator. The traveler persona is: ".$persona.". ".
-    "For EACH slot, choose the ONE candidate index that best fits this persona's taste ".
-    "(e.g. a girls' trip prefers trendy cafes, dessert, photogenic and stylish restaurants, NOT plain gukbap diners or fish markets). ".
-    "Then write a vivid, specific 2-sentence description in ENGLISH for the chosen place, matching the persona's vibe. ".
-    "Return STRICT JSON only: {\"picks\":[{\"slot\":<int>,\"index\":<int>,\"blurb\":\"<english>\"}]}. No markdown.";
-  $payload = json_encode([
-    'contents' => [[ 'parts' => [[ 'text' => $sys."\n\nCANDIDATES:".$slotsTxt ]] ]],
-    'generationConfig' => [ 'temperature'=>0.8, 'responseMimeType'=>'application/json' ]
-  ]);
-  $gurl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='.$GEMINI_KEY;
-  $gctx = stream_context_create(['http'=>[
-    'method'=>'POST',
-    'header'=>"Content-Type: application/json\r\n",
-    'content'=>$payload,
-    'timeout'=>25,
-    'ignore_errors'=>true
-  ]]);
-  $gr = @file_get_contents($gurl, false, $gctx);
-  if ($gr === false) { http_response_code(502); echo json_encode(['error'=>'ai_upstream']); exit; }
-  $gj = json_decode($gr, true);
-  $text = '';
-  if (isset($gj['candidates'][0]['content']['parts'][0]['text'])) $text = $gj['candidates'][0]['content']['parts'][0]['text'];
-  if ($text === '') { http_response_code(502); echo json_encode(['error'=>'ai_empty']); exit; }
-  $parsed = json_decode($text, true);
-  if (!$parsed || !isset($parsed['picks'])) { echo json_encode(['error'=>'ai_parse','rawtext'=>$text]); exit; }
-  echo json_encode($parsed); exit;
+  $prompt = "You are a Korea travel planner. Persona: $persona.\n\n$slotsTxt\nFor each slot, pick the best option for this persona. Reply ONLY with a JSON array (no markdown), one object per slot: [{\"slot\":1,\"pick\":1,\"blurb\":\"2-sentence English description\"}]";
+  $gemUrl  = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='.GEMINI_API_KEY;
+  $gemBody = json_encode(['contents'=>[['parts'=>[['text'=>$prompt]]]]]);
+  $ctx = stream_context_create(['http'=>['method'=>'POST','header'=>'Content-Type: application/json','content'=>$gemBody,'timeout'=>15]]);
+  $raw = @file_get_contents($gemUrl, false, $ctx);
+  if ($raw === false) { http_response_code(502); echo json_encode(['error'=>'ai_error']); exit; }
+  $resp = json_decode($raw, true);
+  $text = $resp['candidates'][0]['content']['parts'][0]['text'] ?? '';
+  $text = trim(preg_replace('/^```(?:json)?/m','',preg_replace('/```$/m','',$text)));
+  $picks = json_decode($text, true);
+  if (!$picks || !is_array($picks)) {
+    echo json_encode(['error'=>'ai_parse','raw'=>substr($text,0,300)]); exit;
+  }
+  echo json_encode(['results'=>$picks]); exit;
 }
-
 
 if ($action === 'aicheck') {
   $defined = defined('GEMINI_API_KEY');
