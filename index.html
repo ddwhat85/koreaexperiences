@@ -1695,7 +1695,7 @@ PAID_ICONS["Theme Park & Water"]="🎢";
     ov.innerHTML=[
       '<div id="kcf-aigate-box" role="dialog" aria-modal="true">',
       '<h2>Unlock Your AI Korea Trip</h2>',
-      '<p class="sub">One-time payment &mdash; here is what you get</p>',
+      '<p class="sub">One-time $1.99 &mdash; up to 10 AI trip plans. Here is what you get:</p>',
       '<ul>',
       '<li><span class="ic">&#10003;</span><span><b>Up to 10 trip generations.</b> Reroll the AI plan up to 10 times to find the one you like.</span></li>',
       '<li><span class="ic">&#10003;</span><span><b>Real Korea data, AI-curated.</b> Spots are drawn from the Korea Tourism Organization dataset, plus the Good Restaurant (Chakhan Sikdang) and 100-Year Restaurant lists, then arranged by AI.</span></li>',
@@ -1713,17 +1713,39 @@ PAID_ICONS["Theme Park & Water"]="🎢";
   }
     var __kcfBtnTimer=null;
   function kcfUpdateTryBtn(){
-    var c=kcfGetCredits(); if(!c) return;
-    var btns=document.querySelectorAll("button");
-    for(var i=0;i<btns.length;i++){
-      var b=btns[i];
-      if(!/try another|limit reached/i.test(b.textContent)) continue;
-      var remaining=c.total-c.used;
-      if(remaining<=0){ b.textContent="Limit reached ("+c.used+"/"+c.total+")"; b.disabled=true; b.style.opacity="0.5"; b.style.cursor="not-allowed"; }
-      else { b.textContent="\uD83D\uDD04 Try another ("+c.used+"/"+c.total+")"; b.disabled=false; b.style.opacity=""; b.style.cursor=""; }
-    }
-  }
-  function kcfScheduleUpdate(){ if(__kcfBtnTimer) return; __kcfBtnTimer=setTimeout(function(){ __kcfBtnTimer=null; kcfUpdateTryBtn(); }, 250); }
+        var raw=null; try{ raw=localStorage.getItem("kcf_trip_credits"); }catch(e){}
+        var c = raw ? JSON.parse(raw) : null;
+        if(!c || typeof c.total!=="number") return;
+        var btns = document.querySelectorAll("button");
+        for(var i=0;i<btns.length;i++){
+          var b = btns[i];
+          if(!/try another|limit reached/i.test(b.textContent||"")) continue;
+          var left = c.total - (c.used||0);
+          var note = b.parentNode ? b.parentNode.querySelector(".kcf-limit-note") : null;
+          if(left<=0){
+            b.textContent = "\uD83D\uDEAB Limit reached ("+c.total+"/"+c.total+")";
+            b.disabled = true;
+            b.style.opacity = "0.5";
+            b.style.cursor = "not-allowed";
+            b.style.pointerEvents = "none";
+            if(!note && b.parentNode){
+              note = document.createElement("div");
+              note.className = "kcf-limit-note";
+              note.style.cssText = "width:100%;margin-top:10px;font-size:13px;color:#6B7280;text-align:center;line-height:1.5;";
+              note.innerHTML = "You have used all "+c.total+" AI trip plans. To generate more, tap <b>AI Random Trip</b> and purchase again.";
+              b.parentNode.appendChild(note);
+            }
+          } else {
+            b.textContent = "\uD83D\uDD04 Try another ("+(c.used||0)+"/"+c.total+")";
+            b.disabled = false;
+            b.style.opacity = "";
+            b.style.cursor = "";
+            b.style.pointerEvents = "";
+            if(note) note.remove();
+          }
+        }
+      }
+      function kcfScheduleUpdate(){ if(__kcfBtnTimer) return; __kcfBtnTimer=setTimeout(function(){ __kcfBtnTimer=null; kcfUpdateTryBtn(); }, 250); }
   function kcfInstallCounter(){
     if(window.__kcf_startWrapped) return;
     if(typeof window.__KCF_start!=="function") return;
