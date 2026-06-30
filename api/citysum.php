@@ -43,7 +43,7 @@ $payload = array(
   'contents' => array(
     array('parts' => array(array('text' => $prompt)))
   ),
-  'generationConfig' => array('temperature' => 0.4, 'maxOutputTokens' => 220)
+  'generationConfig' => array('temperature' => 0.4, 'maxOutputTokens' => 800, 'thinkingConfig' => array('thinkingBudget' => 0))
 );
 
 $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . GEMINI_API_KEY;
