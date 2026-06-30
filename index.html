@@ -1651,5 +1651,50 @@ PAID_ICONS["Theme Park & Water"]="🎢";
   obs.observe(document.documentElement, { childList:true, subtree:true });
 })();
 </script>
+
+<style id="kcf-aigate-style">
+#kcf-aigate-ov{position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;}
+#kcf-aigate-box{background:#fff;max-width:440px;width:100%;border-radius:18px;padding:28px 26px;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:inherit;max-height:90vh;overflow:auto;}
+#kcf-aigate-box h2{font-size:21px;font-weight:800;margin:0 0 6px;color:#0f172a;}
+#kcf-aigate-box .sub{font-size:13px;color:#64748b;margin:0 0 18px;}
+#kcf-aigate-box ul{list-style:none;padding:0;margin:0 0 16px;}
+#kcf-aigate-box li{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:#334155;margin-bottom:10px;line-height:1.45;}
+#kcf-aigate-box li .ic{color:#2563eb;font-weight:800;flex:0 0 auto;}
+#kcf-aigate-note{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px;font-size:12.5px;color:#475569;line-height:1.5;margin-bottom:18px;}
+#kcf-aigate-pay{width:100%;background:#2563eb;color:#fff;border:none;border-radius:12px;padding:14px;font-size:16px;font-weight:800;cursor:pointer;}
+#kcf-aigate-pay:hover{background:#1d4ed8;}
+#kcf-aigate-cancel{display:block;width:100%;text-align:center;background:none;border:none;color:#64748b;font-size:13px;margin-top:12px;cursor:pointer;text-decoration:underline;}
+</style>
+<script>
+(function(){
+  var PRICE_ID="pri_01kw9690mp8zpnx1ctye308gww";
+  function startTrip(){ if(typeof window.openTripPlanner==="function"){ window.openTripPlanner(); } else if(window.__kcf_origAiTripGate){ window.__kcf_origAiTripGate(); } }
+  function pay(){ try{ Paddle.Checkout.open({ items:[{priceId:PRICE_ID,quantity:1}], eventCallback:function(d){ if(d&&d.name==="checkout.completed"){ try{Paddle.Checkout.close();}catch(e){} startTrip(); } } }); }catch(e){ alert("Checkout error: "+e.message); } }
+  function showGate(){
+    if(document.getElementById("kcf-aigate-ov")) return;
+    var ov=document.createElement("div"); ov.id="kcf-aigate-ov";
+    ov.innerHTML=[
+      '<div id="kcf-aigate-box" role="dialog" aria-modal="true">',
+      '<h2>Unlock Your AI Korea Trip</h2>',
+      '<p class="sub">One-time payment &mdash; here is what you get</p>',
+      '<ul>',
+      '<li><span class="ic">&#10003;</span><span><b>Up to 10 trip generations.</b> Reroll the AI plan up to 10 times to find the one you like.</span></li>',
+      '<li><span class="ic">&#10003;</span><span><b>Real Korea data, AI-curated.</b> Spots are drawn from the Korea Tourism Organization dataset, plus the Good Restaurant (Chakhan Sikdang) and 100-Year Restaurant lists, then arranged by AI.</span></li>',
+      '<li><span class="ic">&#10003;</span><span><b>Day-by-day itinerary</b> with a Seoul-relative location guide and a Google Maps view.</span></li>',
+      '</ul>',
+      '<div id="kcf-aigate-note">Please note: results are AI-generated, so the match with your taste may not be 100% accurate. There is no print button &mdash; take a screenshot to save your plan.</div>',
+      '<button id="kcf-aigate-pay">Pay $1.99 &amp; Start</button>',
+      '<button id="kcf-aigate-cancel">Maybe later</button>',
+      '</div>'
+    ].join("");
+    document.body.appendChild(ov);
+    ov.addEventListener("click",function(e){ if(e.target===ov) ov.remove(); });
+    document.getElementById("kcf-aigate-cancel").onclick=function(){ ov.remove(); };
+    document.getElementById("kcf-aigate-pay").onclick=function(){ ov.remove(); pay(); };
+  }
+  function install(){ if(!window.__kcf_origAiTripGate && typeof window.aiTripGate==="function"){ window.__kcf_origAiTripGate=window.aiTripGate; } window.aiTripGate=showGate; }
+  if(document.readyState==="complete"||document.readyState==="interactive"){ setTimeout(install,300); } else { window.addEventListener("DOMContentLoaded",function(){ setTimeout(install,300); }); }
+})();
+</script>
 </body>
 </html>
