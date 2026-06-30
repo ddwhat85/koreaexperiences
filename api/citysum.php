@@ -1,49 +1,57 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
+header('Access-Control-Allow-Origin: *');
 
 require __DIR__ . '/config.php';
 
 if (!defined('GEMINI_API_KEY') || GEMINI_API_KEY === '') {
-  echo json_encode(array('error' => 'ai_unconfigured'));
+  http_response_code(503);
+  echo json_encode(['error' => 'no_key']);
   exit;
 }
 
 $raw = file_get_contents('php://input');
 $in  = json_decode($raw, true);
-if (!is_array($in)) { $in = array(); }
+if (!is_array($in)) { $in = []; }
 
 $city     = isset($in['city'])     ? trim($in['city'])     : '';
 $province = isset($in['province']) ? trim($in['province']) : '';
 $persona  = isset($in['persona'])  ? trim($in['persona'])  : '';
-$places   = isset($in['places']) && is_array($in['places']) ? $in['places'] : array();
+$places   = (isset($in['places']) && is_array($in['places'])) ? $in['places'] : array();
 
 if ($city === '') {
-  echo json_encode(array('error' => 'bad_input'));
+  http_response_code(400);
+  echo json_encode(['error' => 'bad_input']);
   exit;
 }
 
 $placeList = '';
-foreach ($places as $p) {
-  $nm = is_array($p) ? (isset($p['name']) ? $p['name'] : '') : (string)$p;
-  if ($nm !== '') { $placeList .= '- ' . $nm . "\n"; }
+if (!empty($places)) {
+  $clean = array();
+  foreach ($places as $p) { $p = trim((string)$p); if ($p !== '') { $clean[] = $p; } }
+  if (!empty($clean)) { $placeList = implode(', ', $clean); }
 }
 
-$prompt  = "You are a Korea travel concierge writing for FOREIGN tourists who do not read Korean.\n";
-$prompt .= "Write a SHORT trip overview (2-3 sentences, plain English) for a day trip.\n";
-$prompt .= "City: " . $city . ($province !== '' ? (" (" . $province . ")") : "") . "\n";
-if ($persona !== '') { $prompt .= "Traveler type: " . $persona . "\n"; }
-if ($placeList !== '') { $prompt .= "Planned stops:\n" . $placeList; }
-$prompt .= "\nRULES:\n";
-$prompt .= "- First sentence: say roughly WHERE this city sits in South Korea relative to Seoul (e.g. 'about 3 hours south of Seoul', 'on the southeast coast', 'on Jeju Island'). Be approximate but honest; never invent exact distances you are unsure of.\n";
-$prompt .= "- Then 1-2 sentences on what the day feels like and why it fits the traveler type.\n";
-$prompt .= "- No markdown, no headings, no emojis. Do NOT exaggerate or use words like 'hidden gem' or 'Instagram hotspot'.\n";
-$prompt .= "Reply with PLAIN TEXT only.";
+$loc = $province !== '' ? ($city . ', ' . $province) : $city;
+
+$prompt  = "You are writing a short intro for a travel app for foreign visitors to South Korea.\n";
+$prompt .= "City: " . $loc . ".\n";
+if ($persona !== '')   { $prompt .= "Traveler type: " . $persona . ".\n"; }
+if ($placeList !== '') { $prompt .= "Featured spots: " . $placeList . ".\n"; }
+$prompt .= "Write 2 to 3 sentences in natural English. ";
+$prompt .= "The FIRST sentence MUST say where this city is located in South Korea relative to Seoul ";
+$prompt .= "(compass direction from Seoul, approximate distance in km, and roughly how to get there such as KTX hours). ";
+$prompt .= "If the city IS Seoul, say it is the capital in the northwest of the country instead. ";
+$prompt .= "Then briefly describe what makes a trip here appealing for this traveler. ";
+$prompt .= "Be factual, do not invent specific opening hours or prices. Plain text only, no markdown, no lists.";
 
 $payload = array(
-  'contents' => array(
-    array('parts' => array(array('text' => $prompt)))
-  ),
-  'generationConfig' => array('temperature' => 0.4, 'maxOutputTokens' => 800, 'thinkingConfig' => array('thinkingBudget' => 0))
+  'contents' => array(array('parts' => array(array('text' => $prompt)))),
+  'generationConfig' => array(
+    'temperature' => 0.7,
+    'maxOutputTokens' => 800,
+    'thinkingConfig' => array('thinkingBudget' => 0)
+  )
 );
 
 $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
@@ -51,14 +59,18 @@ $url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash
 $ch = curl_init($url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json', 'x-goog-api-key: ' . GEMINI_API_KEY));
+curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+  'Content-Type: application/json',
+  'x-goog-api-key: ' . GEMINI_API_KEY
+));
 curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+curl_setopt($ch, CURLOPT_TIMEOUT, 25);
 $resp = curl_exec($ch);
 $err  = curl_error($ch);
 curl_close($ch);
 
-if ($resp === false || $resp === '') {
+if ($resp === false) {
+  http_response_code(502);
   echo json_encode(array('error' => 'ai_failed', 'detail' => $err));
   exit;
 }
