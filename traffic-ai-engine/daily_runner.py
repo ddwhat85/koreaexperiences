@@ -70,8 +70,11 @@ def load_published_ids() -> set[str]:
         return set()
     try:
         data = json.loads(STATE_PATH.read_text(encoding="utf-8"))
-        today_str = date.today().isoformat()
-        return set(data.get(today_str, []))
+        # 오늘뿐 아니라 저장된 모든 날의 ID를 제외 목록에 포함 (중복 발행 방지)
+        all_ids: set[str] = set()
+        for ids in data.values():
+            all_ids.update(ids)
+        return all_ids
     except Exception as e:
         logger.warning(f"state 로드 실패: {e}")
         return set()
@@ -118,7 +121,7 @@ CITY_SITUATIONS = {
         "삿포로 다누키코지 쿃핑 아케이드를 걸다가",
         "삿포로역 지하 아피아몰에서",
         "오도리 공원 근체 드럭스토어 들렀다가",
-        "홈하이도 대학 캐퍼스 근체 편의점에서",
+        "홈하이도 대학 칄퍼스 근체 편의점에서",
     ],
     "오사카": [
         "도톤보리 돌아다니다 들린 마씁키요에서",
@@ -387,4 +390,3 @@ if __name__ == "__main__":
         dry_run         = args.dry_run,
         limit           = args.limit,
     )
-
