@@ -1607,5 +1607,49 @@ PAID_ICONS["Theme Park & Water"]="🎢";
 
 </script>
 
+
+<script>
+(function(){
+  if (window.__kcfSumInit) return; window.__kcfSumInit = true;
+  var CARD_ID = "kcf-citysum-card";
+  function mapsUrl(city){ var q = encodeURIComponent(city + ", South Korea"); return "https://www.google.com/maps?q=" + q + "&z=11&output=embed"; }
+  function buildCard(city){
+    var wrap = document.createElement("div");
+    wrap.id = CARD_ID;
+    wrap.style.cssText = "margin:0 0 18px 0;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.06);";
+    wrap.innerHTML =
+      '<div style="padding:16px 18px 4px 18px;">'
+      +   '<div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:#2563eb;text-transform:uppercase;">About ' + city + '</div>'
+      +   '<p id="kcf-sum-text" style="margin:8px 0 14px 0;font-size:15px;line-height:1.55;color:#374151;">Loading a quick overview...</p>'
+      + '</div>'
+      + '<iframe title="Map of ' + city + '" src="' + mapsUrl(city) + '" style="width:100%;height:220px;border:0;display:block;" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>';
+    return wrap;
+  }
+  function fetchSummary(city, cb){
+    fetch("/api/citysum.php", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ city: city }) })
+      .then(function(r){ return r.json(); })
+      .then(function(j){ cb(j && j.summary ? j.summary : ""); })
+      .catch(function(){ cb(""); });
+  }
+  function inject(body){
+    if (!body || document.getElementById(CARD_ID)) return;
+    var last = window.__KCF_LAST || {};
+    var city = (last.city || "").trim();
+    if (!city) return;
+    body.insertBefore(buildCard(city), body.firstChild);
+    fetchSummary(city, function(text){
+      var el = document.getElementById("kcf-sum-text");
+      if (!el) return;
+      if (text) { el.textContent = text; }
+      else { var c = document.getElementById(CARD_ID); if (c) c.style.display = "none"; }
+    });
+  }
+  var obs = new MutationObserver(function(){
+    var body = document.getElementById("kcf-body");
+    if (body && !document.getElementById(CARD_ID) && window.__KCF_LAST && window.__KCF_LAST.city) { inject(body); }
+  });
+  obs.observe(document.documentElement, { childList:true, subtree:true });
+})();
+</script>
 </body>
 </html>
