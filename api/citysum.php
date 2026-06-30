@@ -64,6 +64,7 @@ if ($resp === false || $resp === '') {
 }
 
 $j = json_decode($resp, true);
+if (isset($_GET['debug'])) { echo $resp; exit; }
 $text = '';
 if (isset($j['candidates'][0]['content']['parts'][0]['text'])) {
   $text = trim($j['candidates'][0]['content']['parts'][0]['text']);
