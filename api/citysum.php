@@ -46,12 +46,12 @@ $payload = array(
   'generationConfig' => array('temperature' => 0.4, 'maxOutputTokens' => 800, 'thinkingConfig' => array('thinkingBudget' => 0))
 );
 
-$url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . GEMINI_API_KEY;
+$url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 $ch = curl_init($url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json', 'x-goog-api-key: ' . GEMINI_API_KEY));
 curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
 curl_setopt($ch, CURLOPT_TIMEOUT, 20);
 $resp = curl_exec($ch);
