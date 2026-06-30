@@ -1668,8 +1668,27 @@ PAID_ICONS["Theme Park & Water"]="🎢";
 <script>
 (function(){
   var PRICE_ID="pri_01kw9690mp8zpnx1ctye308gww";
-  function startTrip(){ if(typeof window.openTripPlanner==="function"){ window.openTripPlanner(); } else if(window.__kcf_origAiTripGate){ window.__kcf_origAiTripGate(); } }
-  function pay(){ try{ Paddle.Checkout.open({ items:[{priceId:PRICE_ID,quantity:1}], eventCallback:function(d){ if(d&&d.name==="checkout.completed"){ try{Paddle.Checkout.close();}catch(e){} startTrip(); } } }); }catch(e){ alert("Checkout error: "+e.message); } }
+    var LS_CREDITS="kcf_trip_credits";
+  function kcfGetCredits(){ try{ var v=JSON.parse(localStorage.getItem(LS_CREDITS)||"null"); if(v&&typeof v.total==="number"&&typeof v.used==="number") return v; }catch(e){} return null; }
+  function kcfSetCredits(c){ try{ localStorage.setItem(LS_CREDITS, JSON.stringify(c)); }catch(e){} }
+  function kcfGrant(qty){ var q=parseInt(qty,10); if(!q||q<1)q=1; kcfSetCredits({total:q*10, used:0}); }
+  function startTrip(){ if(typeof window.openTripPlanner==="function"){ window.openTripPlanner(); } else if(window.__kcf_origAiTripGate){ window.__kcf_origAiTripGate(); } setTimeout(kcfUpdateTryBtn, 400); }
+  function pay(){
+    try{
+      Paddle.Checkout.open({
+        items:[{priceId:PRICE_ID,quantity:1}],
+        eventCallback:function(d){
+          if(d&&d.name==="checkout.completed"){
+            var qty=1; try{ if(d.data&&d.data.items&&d.data.items.length){ qty=d.data.items[0].quantity||1; } }catch(e){}
+            kcfGrant(qty);
+            try{Paddle.Checkout.close();}catch(e){}
+            startTrip();
+          }
+        }
+      });
+    }catch(e){ alert("Checkout error: "+e.message); }
+  }
+  
   function showGate(){
     if(document.getElementById("kcf-aigate-ov")) return;
     var ov=document.createElement("div"); ov.id="kcf-aigate-ov";
@@ -1692,8 +1711,38 @@ PAID_ICONS["Theme Park & Water"]="🎢";
     document.getElementById("kcf-aigate-cancel").onclick=function(){ ov.remove(); };
     document.getElementById("kcf-aigate-pay").onclick=function(){ ov.remove(); pay(); };
   }
-  function install(){ if(!window.__kcf_origAiTripGate && typeof window.aiTripGate==="function"){ window.__kcf_origAiTripGate=window.aiTripGate; } window.aiTripGate=showGate; }
-  if(document.readyState==="complete"||document.readyState==="interactive"){ setTimeout(install,300); } else { window.addEventListener("DOMContentLoaded",function(){ setTimeout(install,300); }); }
+    var __kcfBtnTimer=null;
+  function kcfUpdateTryBtn(){
+    var c=kcfGetCredits(); if(!c) return;
+    var btns=document.querySelectorAll("button");
+    for(var i=0;i<btns.length;i++){
+      var b=btns[i];
+      if(!/try another|limit reached/i.test(b.textContent)) continue;
+      var remaining=c.total-c.used;
+      if(remaining<=0){ b.textContent="Limit reached ("+c.used+"/"+c.total+")"; b.disabled=true; b.style.opacity="0.5"; b.style.cursor="not-allowed"; }
+      else { b.textContent="\uD83D\uDD04 Try another ("+c.used+"/"+c.total+")"; b.disabled=false; b.style.opacity=""; b.style.cursor=""; }
+    }
+  }
+  function kcfScheduleUpdate(){ if(__kcfBtnTimer) return; __kcfBtnTimer=setTimeout(function(){ __kcfBtnTimer=null; kcfUpdateTryBtn(); }, 250); }
+  function kcfInstallCounter(){
+    if(window.__kcf_startWrapped) return;
+    if(typeof window.__KCF_start!=="function") return;
+    window.__kcf_startWrapped=true;
+    window.__kcf_origStart=window.__KCF_start;
+    window.__KCF_start=function(){
+      var c=kcfGetCredits();
+      if(c){ if(c.used>=c.total){ kcfUpdateTryBtn(); return; } c.used++; kcfSetCredits(c); }
+      setTimeout(kcfUpdateTryBtn, 300);
+      return window.__kcf_origStart.apply(this, arguments);
+    };
+    try{ var mo=new MutationObserver(function(){ kcfScheduleUpdate(); }); mo.observe(document.body,{childList:true,subtree:true}); }catch(e){}
+  }
+  function install(){
+    if(!window.__kcf_origAiTripGate && typeof window.aiTripGate==="function"){ window.__kcf_origAiTripGate=window.aiTripGate; }
+    window.aiTripGate=showGate;
+    kcfInstallCounter();
+  }
+  if(document.readyState==="complete"||document.readyState==="interactive"){ setTimeout(install,400); } else { window.addEventListener("DOMContentLoaded",function(){ setTimeout(install,400); }); }
 })();
 </script>
 </body>
