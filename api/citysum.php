@@ -8,18 +8,6 @@ if (!defined('GEMINI_API_KEY') || GEMINI_API_KEY === '') {
   exit;
 }
 
-if (isset($_GET['keydiag'])) {
-  $k = GEMINI_API_KEY;
-  echo json_encode(array(
-    'keylen' => strlen($k),
-    'prefix' => substr($k, 0, 4),
-    'suffix' => substr($k, -4),
-    'hasSpace' => (trim($k) !== $k),
-    'authMethod' => 'x-goog-api-key header'
-  ));
-  exit;
-}
-
 $raw = file_get_contents('php://input');
 $in  = json_decode($raw, true);
 if (!is_array($in)) { $in = array(); }
@@ -76,7 +64,6 @@ if ($resp === false || $resp === '') {
 }
 
 $j = json_decode($resp, true);
-if (isset($_GET['debug'])) { echo $resp; exit; }
 $text = '';
 if (isset($j['candidates'][0]['content']['parts'][0]['text'])) {
   $text = trim($j['candidates'][0]['content']['parts'][0]['text']);
