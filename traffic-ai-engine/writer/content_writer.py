@@ -40,6 +40,7 @@ class StoryPacket:
     story_theme:      str
     product_features: list = field(default_factory=list)
     price_krw:        Optional[int] = None
+    image_url_2:      str = ""
 
 
 @dataclass
@@ -56,15 +57,13 @@ class ContentOutput:
 # [B] 톤앤매너 레이어 — 5 톤 × 5 구조
 # ===========================================================================
 
-# 팔로워 호칭 풀 — 계정별 실제 사용 표현
 FOLLOWER_TERMS = [
-    "스친이들",    # ddwhat1985
-    "치니덜",      # dior8524
-    "스치나들",    # yoonseul_ys
-    "치니",        # dior8524 단수형
+    "스친이들",
+    "치니덜",
+    "스치나들",
+    "치니",
 ]
 
-# ---------- 구조 변형 ----------
 STRUCTURE_VARIANTS = {
     "situation_first": {
         "label": "상황 → 발견 → 특징 → 질문",
@@ -108,7 +107,6 @@ STRUCTURE_VARIANTS = {
     },
 }
 
-# ---------- 톤 변형 ----------
 TONE_VARIANTS = {
     "ddwhat_basic": {
         "label": "ddwhat 기본체",
@@ -145,8 +143,7 @@ TONE_VARIANTS = {
             "dior8524 말투. '..' 줄임표로 말 흐리기. 'ㅎㅎ' 가볍게. "
             "'치니덜' 또는 '스치나들' 호칭. "
             "'넘나', '넘', '짱이지', '~아님?', '~있었냥?' 사용. "
-            "알고리즘/우연 타이밍 썰 한 줄 넣기 (예: '알고리즘이 자꾸 보여주는거야..', "
-            "'새벽에 눈눴는데 이게 뜨는거야..') "
+            "알고리즘/우연 타이밍 썰 한 줄 넣기. "
             "예시:\n"
             "오지마..전쟁통이야..\n"
             "세일기간 이야..?\n"
@@ -186,7 +183,6 @@ TONE_VARIANTS = {
     },
 }
 
-# ---------- 핸드폰 오타 패턴 ----------
 PHONE_TYPO_EXAMPLES = [
     ("엄청",      "업청"),
     ("엄청나",    "업청나"),
@@ -206,7 +202,6 @@ PHONE_TYPO_EXAMPLES = [
     ("아는사람",  "아는사람?ㅎ"),
 ]
 
-# ---------- 오프닝 훅 풀 ----------
 OPENING_HOOKS = [
     "오늘 {city} 놀러왔는데",
     "지난번에 {city} 갔을때",
@@ -294,7 +289,6 @@ def get_ai_provider() -> BaseAIProvider:
 # [D] ContentWriter 메인 클래스
 # ===========================================================================
 
-# 첫 댓글 고정 템플릿 (5makase.com 홍보)
 FIRST_COMMENT_TEMPLATES = [
     "사진 속 이 제품, 일본 직구로 구할 수 있어~ 5makase.com 한번 들러봐 👀",
     "이거 일본 직구 궁금하면 → 5makase.com 에서 찾아봐! 일본 직구 전문이야",
@@ -314,7 +308,6 @@ class ContentWriter:
 7. AI처럼 들리는 문장 금지: '~것 같지 않니?', '~어떠세요?', '~해보세요', '~드립니다' 절대 금지
 8. 실제 사람이 핸드폰으로 빠르게 타이핑한 것처럼 — 완벽한 문장보다 약간 거친 게 더 자연스러움""".strip()
 
-    # 실제 바이럴 포스트 5개 예시 (시스템 프롬프트 내장)
     _POST_EXAMPLES = """[실제 포스트 예시 1 — ddwhat1985 쇼핑 발견체 (10줄+)]
 오늘 삿포로 놀러왔는데 니시마츠야 있어
 여기가 유아옷 애기 용품 업청 싸게 팔어
@@ -443,7 +436,7 @@ class ContentWriter:
             emotion=packet.emotion,
         )
         features = ", ".join(packet.product_features[:3]) if packet.product_features else "효과 좋음"
-        price_line = ""  # 가격 글에서 제외
+        price_line = ""
 
         return f"""[스토리 컨텍스트]
 여행지: {packet.city}
@@ -485,6 +478,12 @@ class ContentWriter:
         return issues
 
     def generate(self, packet: StoryPacket, max_attempts: int = 3) -> ContentOutput:
+        last_content = ""
+        last_data = {}
+        last_tone = None
+        last_structure = None
+        last_user = ""
+
         for attempt in range(1, max_attempts + 1):
             structure, tone, hook_tmpl, follower_term = self._pick_variants()
             system = self._build_system_prompt(structure, tone, follower_term)
@@ -505,6 +504,13 @@ class ContentWriter:
             content = data.get("content", "")
             issues  = self._validate_content(content)
 
+            if content:
+                last_content = content
+                last_data = data
+                last_tone = tone
+                last_structure = structure
+                last_user = user
+
             if issues:
                 logger.warning(f"[RULE VIOLATION] attempt={attempt} | {issues}")
                 continue
@@ -519,7 +525,20 @@ class ContentWriter:
                 raw_prompt        = user,
             )
 
-        raise RuntimeError(f"콘텐츠 생성 실패: {max_attempts}회 모두 규칙 위반")
+        if last_content:
+            logger.warning("[GEN FALLBACK] 규칙 위반 → URL/해시태그 자동 제거 후 발행")
+            clean = re.sub(r'https?://\S+|www\.\S+', '', last_content)
+            clean = re.sub(r'#\w+', '', clean).strip()
+            return ContentOutput(
+                content           = clean,
+                first_comment     = random.choice(FIRST_COMMENT_TEMPLATES),
+                faq_data          = last_data.get("faq", []),
+                tone_variant      = last_tone["label"] if last_tone else "unknown",
+                structure_variant = last_structure["label"] if last_structure else "unknown",
+                raw_prompt        = last_user,
+            )
+
+        raise RuntimeError(f"콘텐츠 생성 실패: {max_attempts}회 모두 파싱 오류")
 
 
 if __name__ == "__main__":
