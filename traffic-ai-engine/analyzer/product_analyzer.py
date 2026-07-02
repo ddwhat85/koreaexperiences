@@ -76,6 +76,7 @@ class ProductData:
     review_score: float = 0.0   # 0~100 스케일로 정규화
     city:         str = "일본"
     raw_data:     dict = field(default_factory=dict)
+    image_url_2: str = ""
 
     @property
     def discount_rate(self) -> float:
@@ -575,7 +576,9 @@ class ProductAnalyzer:
         image_url이 완전히 비어 있는 경우에만
         상품 페이지의 og:image 메타태그로 교체.
         (untrusted domain URL도 그대로 사용 — 스토어 배너 오염 방지)
+        Pexels에서 두 번째 이미지도 가져온다.
         """
+        pexels_key = os.getenv("PEXELS_API_KEY", "")
         for p in products:
             needs_refresh = not p.image_url
             if needs_refresh and p.product_url:
@@ -586,6 +589,36 @@ class ProductAnalyzer:
                     p.image_url = og_url
                 else:
                     logger.warning(f"[OG:IMAGE] ✗ {p.product_name[:30]} — og:image 없음")
+            if pexels_key and not p.image_url_2:
+                p.image_url_2 = self._fetch_pexels_image(p, pexels_key)
+
+    def _fetch_pexels_image(self, product, api_key: str) -> str:
+        keywords = {
+            "뷰티/스킨케어": "japanese beauty skincare shop",
+            "드럭스토어": "japanese drugstore shopping",
+            "식품/간식": "japanese snacks convenience store",
+            "헤어케어": "japanese haircare products",
+        }
+        query = keywords.get(product.category, "japan shopping products")
+        name_words = product.product_name.split()[:2]
+        if name_words:
+            query = " ".join(name_words) + " japan"
+        try:
+            resp = requests.get(
+                "https://api.pexels.com/v1/search",
+                headers={"Authorization": api_key},
+                params={"query": query, "per_page": 5, "orientation": "square"},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            photos = resp.json().get("photos", [])
+            for photo in photos:
+                url = photo["src"]["medium"]
+                if url != product.image_url:
+                    return url
+        except Exception as e:
+            logger.warning(f"[PEXELS] {e}")
+        return ""
 
     def pick_best(
         self,
