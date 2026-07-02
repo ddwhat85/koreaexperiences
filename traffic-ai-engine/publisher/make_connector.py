@@ -52,7 +52,8 @@ class PublishPacket:
     faq_data: list = field(default_factory=list)
     review_score: float = 0.0
     story_theme: str = ""
-    generation_attempt: int = 1
+        image_url_2: str = ""
+generation_attempt: int = 1
     pipeline_id: str = field(default_factory=lambda: datetime.utcnow().strftime("%Y%m%d-%H%M%S"))
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
@@ -63,6 +64,7 @@ class PublishPacket:
             "store_name":         self.store_name,
             "product_name":       self.product_name,
             "image_url":          self.image_url,
+            "image_url_2":        self.image_url_2,
             "product_url":        self.product_url,
             "content":            self.content,
             "target_time":        self.target_time,
