@@ -7,9 +7,11 @@ on:
     - cron: '20 9 * * *'
     - cron: '10 13 * * *'
   workflow_dispatch:
-
-permissions:
-  contents: write
+    inputs:
+      slot:
+        description: 'Target slot (leave empty for auto-pick)'
+        required: false
+        default: ''
 
 jobs:
   publish:
@@ -39,14 +41,28 @@ jobs:
         PYTHONIOENCODING: "utf-8"
       run: |
         cd traffic-ai-engine
-        mkdir -p state
-        python daily_runner.py --limit 1
+        mkdir -p logs state
+        SCHEDULE="${{ github.event.schedule }}"
+        MANUAL_SLOT="${{ github.event.inputs.slot }}"
+        case "$SCHEDULE" in
+          "10 23 * * *") SLOT="08:10" ;;
+          "5 3 * * *")   SLOT="12:05" ;;
+          "20 9 * * *")  SLOT="18:20" ;;
+          "10 13 * * *") SLOT="22:10" ;;
+          *)             SLOT="$MANUAL_SLOT" ;;
+        esac
+        if [ -n "$SLOT" ]; then
+          echo "Running with explicit slot: $SLOT"
+          python daily_runner.py --limit 1 --slot "$SLOT"
+        else
+          echo "No slot specified, using next available slot"
+          python daily_runner.py --limit 1
+        fi
 
     - name: Save publish state
       run: |
         git config user.name "TrafficAI Bot"
         git config user.email "trafficai@ddwhat85"
-        git pull --rebase origin main || true
-        git add traffic-ai-engine/state/published_ids.json || true
+        git add traffic-ai-engine/state/ traffic-ai-engine/logs/ || true
         git diff --staged --quiet || git commit -m "chore: publish state [skip ci]"
-        git push origin main
+        git push || true
