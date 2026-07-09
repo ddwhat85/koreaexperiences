@@ -1737,10 +1737,12 @@ PAID_ICONS["Theme Park & Water"]="🎢";
       '<div id="kcf-aigate-note">Please note: results are AI-generated, so the match with your taste may not be 100% accurate. There is no print button &mdash; take a screenshot to save your plan.</div>',
       '<button id="kcf-aigate-pay">Pay $1.99 &amp; Start</button>',
       '<button id="kcf-aigate-cancel">Maybe later</button>',
+      '<div style="text-align:center;margin-top:8px"><button id="kcf-popup-admin" style="background:none;border:none;color:#ccc;font-size:11px;cursor:pointer;padding:4px 10px">admin</button></div>',
       '</div>'
     ].join("");
     document.body.appendChild(ov);
     ov.addEventListener("click",function(e){ if(e.target===ov) ov.remove(); });
+    document.getElementById("kcf-popup-admin").onclick=function(){ document.getElementById("aitg-adm").style.display="flex"; };
     document.getElementById("kcf-aigate-cancel").onclick=function(){ ov.remove(); };
     document.getElementById("kcf-aigate-pay").onclick=function(){ ov.remove(); var _p=window.location.hash.includes('preview=fknadmin2026')||window.location.search.includes('fknadmin2026'); if(_p||window._kcfAdmin){kcfGrant(1);startTrip();}else{pay();} };
   }
