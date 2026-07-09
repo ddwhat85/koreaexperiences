@@ -1800,5 +1800,31 @@ PAID_ICONS["Theme Park & Water"]="🎢";
   if(document.readyState==="complete"||document.readyState==="interactive"){ setTimeout(install,400); } else { window.addEventListener("DOMContentLoaded",function(){ setTimeout(install,400); }); }
 })();
 </script>
+
+<!-- Admin Login -->
+<div id="aitg-admin-btn" onclick="document.getElementById('aitg-adm').style.display='flex'" style="position:fixed;bottom:6px;right:8px;font-size:9px;color:rgba(0,0,0,0.15);cursor:pointer;z-index:9999;user-select:none">admin</div>
+<div id="aitg-adm" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99999;align-items:center;justify-content:center">
+<div style="background:#fff;border-radius:14px;padding:28px 24px;width:300px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+<h3 style="margin:0 0 18px;font-size:16px;color:#111;font-weight:700">관리자 로그인</h3>
+<input id="aitg-aid" type="email" placeholder="이메일" onkeydown="if(event.key==='Enter')document.getElementById('aitg-apw').focus()" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #e0e0e0;border-radius:8px;margin-bottom:10px;font-size:13px">
+<input id="aitg-apw" type="password" placeholder="비밀번호" onkeydown="if(event.key==='Enter')aitgAL()" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #e0e0e0;border-radius:8px;margin-bottom:14px;font-size:13px">
+<div id="aitg-aerr" style="color:#e53935;font-size:11px;margin-bottom:10px;display:none">아이디 또는 비밀번호가 틀렸습니다.</div>
+<div style="display:flex;gap:8px">
+<button onclick="aitgAL()" style="flex:1;padding:9px;background:#1a73e8;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600">로그인</button>
+<button onclick="document.getElementById('aitg-adm').style.display='none'" style="padding:9px 14px;background:#f5f5f5;border:1px solid #e0e0e0;border-radius:8px;cursor:pointer;font-size:13px">취소</button>
+</div>
+</div>
+</div>
+<script>
+function aitgAL(){
+var i=document.getElementById('aitg-aid').value.trim();
+var p=document.getElementById('aitg-apw').value;
+if(i==='info@koreaexperiences.com'&&p==='18281828'){
+localStorage.setItem('kcf_trip_credits',JSON.stringify({total:999,used:0}));
+document.getElementById('aitg-adm').style.display='none';
+location.reload();
+}else{document.getElementById('aitg-aerr').style.display='block';}
+}
+</script>
 </body>
 </html>
