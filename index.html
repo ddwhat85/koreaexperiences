@@ -1742,7 +1742,7 @@ PAID_ICONS["Theme Park & Water"]="🎢";
     document.body.appendChild(ov);
     ov.addEventListener("click",function(e){ if(e.target===ov) ov.remove(); });
     document.getElementById("kcf-aigate-cancel").onclick=function(){ ov.remove(); };
-    document.getElementById("kcf-aigate-pay").onclick=function(){ ov.remove(); if(new URLSearchParams(window.location.search).get('preview')==='fknadmin2026'){kcfGrant(1);startTrip();}else{pay();}};
+    document.getElementById("kcf-aigate-pay").onclick=function(){ ov.remove(); var _p=window.location.hash.includes('preview=fknadmin2026')||window.location.search.includes('fknadmin2026'); if(_p){kcfGrant(1);startTrip();}else{pay();} };
   }
     var __kcfBtnTimer=null;
   function kcfUpdateTryBtn(){
