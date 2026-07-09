@@ -1,0 +1,27 @@
+name: Deploy to Cloudways
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy via SFTP
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
+        with:
+          username: ${{ secrets.KE_SFTP_USER }}
+          server: ${{ secrets.KE_SFTP_HOST }}
+          port: 22
+          ssh_private_key: ${{ secrets.KE_SSH_KEY }}
+          local_path: './index.html'
+          remote_path: ${{ secrets.KE_REMOTE_PATH }}
+          sftp_only: true
+          delete_remote_files: false
+          sftpArgs: '-o StrictHostKeyChecking=no'
