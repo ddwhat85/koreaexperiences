@@ -313,7 +313,7 @@
     function initPaddle(){
       if(!window.Paddle){ return; }
       try{
-        Paddle.Initialize({ token: "test_41699fc65fb2435ad2ebfc49382", eventCallback: function(ev){ if(ev && ev.name === "checkout.completed"){ try{ Paddle.Checkout.close(); }catch(e){} var ov = document.getElementById("aitg-overlay"); if(ov){ ov.remove(); } if(typeof window.openTripPlanner === "function"){ window.openTripPlanner(); } } } });
+        Paddle.Initialize({ token: "live_fb2abf60687a64b22fdeb8c0be6", eventCallback: function(ev){ if(ev && ev.name === "checkout.completed"){ try{ Paddle.Checkout.close(); }catch(e){} var ov = document.getElementById("aitg-overlay"); if(ov){ ov.remove(); } if(typeof window.openTripPlanner === "function"){ window.openTripPlanner(); } } } });
         window.__aitgPaddleReady = true;
       }catch(e){ console.warn("Paddle init failed", e); }
     }
