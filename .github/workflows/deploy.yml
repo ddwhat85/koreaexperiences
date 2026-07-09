@@ -19,13 +19,6 @@ jobs:
           echo "$SSH_KEY" | base64 -d > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
-      - name: Explore remote directory
-        env:
-          SFTP_HOST: ${{ secrets.KE_SFTP_HOST }}
-          SFTP_USER: ${{ secrets.KE_SFTP_USER }}
-        run: |
-          printf 'pwd\nls -la\n' | sftp -b - -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -P 22 "$SFTP_USER@$SFTP_HOST" 2>&1 || true
-
       - name: Deploy via SFTP
         env:
           SFTP_HOST: ${{ secrets.KE_SFTP_HOST }}
