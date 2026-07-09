@@ -313,7 +313,6 @@
     function initPaddle(){
       if(!window.Paddle){ return; }
       try{
-        Paddle.Environment.set("sandbox");
         Paddle.Initialize({ token: "test_41699fc65fb2435ad2ebfc49382", eventCallback: function(ev){ if(ev && ev.name === "checkout.completed"){ try{ Paddle.Checkout.close(); }catch(e){} var ov = document.getElementById("aitg-overlay"); if(ov){ ov.remove(); } if(typeof window.openTripPlanner === "function"){ window.openTripPlanner(); } } } });
         window.__aitgPaddleReady = true;
       }catch(e){ console.warn("Paddle init failed", e); }
@@ -1701,7 +1700,7 @@ PAID_ICONS["Theme Park & Water"]="🎢";
 </style>
 <script>
 (function(){
-  var PRICE_ID="pri_01kw9690mp8zpnx1ctye308gww";
+  var PRICE_ID="pri_01kx27gmetq1wbhvnjwet9b6nx";
     var LS_CREDITS="kcf_trip_credits";
   function kcfGetCredits(){ try{ var v=JSON.parse(localStorage.getItem(LS_CREDITS)||"null"); if(v&&typeof v.total==="number"&&typeof v.used==="number") return v; }catch(e){} return null; }
   function kcfSetCredits(c){ try{ localStorage.setItem(LS_CREDITS, JSON.stringify(c)); }catch(e){} }
