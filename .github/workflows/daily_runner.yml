@@ -1,0 +1,53 @@
+name: TrafficAI Daily Runner
+
+on:
+  # 슬롯 1: 08:10 KST = 23:10 UTC (전날)
+  schedule:
+    - cron: "10 23 * * *"   # 08:10 KST
+    - cron: "5 3 * * *"     # 12:05 KST
+    - cron: "20 9 * * *"    # 18:20 KST
+    - cron: "10 13 * * *"   # 22:10 KST
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: "발행 슬롯 (예: 08:10) — 비워두면 현재 시각 기준 자동 선택"
+        required: false
+      dry_run:
+        description: "dry-run (전송 없이 미리보기)"
+        required: false
+        default: "false"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run daily runner
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          MAKE_WEBHOOK_URL: ${{ secrets.MAKE_WEBHOOK_URL }}
+          NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
+          NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+        run: |
+          cd traffic-ai-engine
+          SLOT_ARG=""
+          DRY_ARG=""
+          if [ -n "${{ github.event.inputs.slot }}" ]; then
+            SLOT_ARG="--slot ${{ github.event.inputs.slot }}"
+          fi
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            DRY_ARG="--dry-run"
+          fi
+          python daily_runner.py $SLOT_ARG $DRY_ARG --limit 1
