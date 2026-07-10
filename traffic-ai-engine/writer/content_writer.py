@@ -40,7 +40,6 @@ class StoryPacket:
     story_theme:      str
     product_features: list = field(default_factory=list)
     price_krw:        Optional[int] = None
-    image_url_2:      str = ""
 
 
 @dataclass
@@ -57,13 +56,15 @@ class ContentOutput:
 # [B] 톤앤매너 레이어 — 5 톤 × 5 구조
 # ===========================================================================
 
+# 팔로워 호칭 풀 — 계정별 실제 사용 표현
 FOLLOWER_TERMS = [
-    "스친이들",
-    "치니덜",
-    "스치나들",
-    "치니",
+    "스친이들",    # ddwhat1985
+    "치니덜",      # dior8524
+    "스치나들",    # yoonseul_ys
+    "치니",        # dior8524 단수형
 ]
 
+# ---------- 구조 변형 ----------
 STRUCTURE_VARIANTS = {
     "situation_first": {
         "label": "상황 → 발견 → 특징 → 질문",
@@ -107,6 +108,7 @@ STRUCTURE_VARIANTS = {
     },
 }
 
+# ---------- 톤 변형 ----------
 TONE_VARIANTS = {
     "ddwhat_basic": {
         "label": "ddwhat 기본체",
@@ -114,12 +116,13 @@ TONE_VARIANTS = {
             "ddwhat1985 실제 말투. 짧은 문장 줄바꿈. "
             "'스친이들' 또는 '치니덜' 호칭. "
             "~있어, ~팔어, ~있음, ~아는 사람? 종결어미. "
-            "가족/아기 언급 절대 금지 ('우리 별씌', '애기', '애기용품' 등 전부 금지). "
+            "가족 언급('우리 별씌', '애기') 자연스럽게 한 번 넣어도 됨. "
             "예시:\n"
-            "오늘 삿포로 놀러왔는데 마쓰모토키요시 들렀는데\n"
-            "여기 드럭스토어 코너 업청 다양하더라\n"
-            "일본 한정 킷캣이 이렇게 많은 건 줄 몰랐음\n"
-            "진짜 업청싸! 스친이들 여기 아는 사람?"
+            "오늘 삿포로 놀러왔는데 니시마츠야 있어\n"
+            "여기가 유아옷 애기 용품 업청 싸게 팔어\n"
+            "티셔츠 한장에 380엔 정도야\n"
+            "진짜 업청싸! 스친이들 여기 아는 사람?\n"
+            "우리 별씌 업청사구있음"
         ),
     },
     "ddwhat_excited": {
@@ -127,12 +130,10 @@ TONE_VARIANTS = {
         "instruction": (
             "진짜 좋아서 흥분된 상태. '진짜' 2~3번 반복 자연스럽게. "
             "상품 경험을 '흡입했다', '미쳤다' 식으로 과장. "
-            "가족/아기 언급 절대 금지. "
-            "감성 과잉 표현 금지: '나에게 작은 행복을', '지쳐있는 나', '위로가 됐다' 같은 드라마틱한 문장 금지. "
             "예시:\n"
-            "진짜 지난번에 일본가서 돈키호테 갔는데\n"
+            "진짜 지난번에 일본가서 먹은 브런치인데\n"
             "진짜 흡입하면서 먹은듯\n"
-            "스친이들 이거 먹어본 사람 있어?\n"
+            "스친이들 오늘 아침 뭐먹나\n"
             "---\n"
             "흥분 뒤 팔로워 일상 끌어들이는 질문으로 끝."
         ),
@@ -143,7 +144,8 @@ TONE_VARIANTS = {
             "dior8524 말투. '..' 줄임표로 말 흐리기. 'ㅎㅎ' 가볍게. "
             "'치니덜' 또는 '스치나들' 호칭. "
             "'넘나', '넘', '짱이지', '~아님?', '~있었냥?' 사용. "
-            "알고리즘/우연 타이밍 썰 한 줄 넣기. "
+            "알고리즘/우연 타이밍 썰 한 줄 넣기 (예: '알고리즘이 자꾸 보여주는거야..', "
+            "'새벽에 눈눴는데 이게 뜨는거야..') "
             "예시:\n"
             "오지마..전쟁통이야..\n"
             "세일기간 이야..?\n"
@@ -183,6 +185,7 @@ TONE_VARIANTS = {
     },
 }
 
+# ---------- 핸드폰 오타 패턴 ----------
 PHONE_TYPO_EXAMPLES = [
     ("엄청",      "업청"),
     ("엄청나",    "업청나"),
@@ -202,6 +205,7 @@ PHONE_TYPO_EXAMPLES = [
     ("아는사람",  "아는사람?ㅎ"),
 ]
 
+# ---------- 오프닝 훅 풀 ----------
 OPENING_HOOKS = [
     "오늘 {city} 놀러왔는데",
     "지난번에 {city} 갔을때",
@@ -289,83 +293,45 @@ def get_ai_provider() -> BaseAIProvider:
 # [D] ContentWriter 메인 클래스
 # ===========================================================================
 
-FIRST_COMMENT_TEMPLATES = [
-    "사진 속 이 제품, 일본 직구로 구할 수 있어~ 5makase.com 한번 들러봐 👀",
-    "이거 일본 직구 궁금하면 → 5makase.com 에서 찾아봐! 일본 직구 전문이야",
-    "직구 링크 알고 싶으면 → www.5makase.com (일본 직구 전문 사이트)",
-    "이 상품 일본에서 직접 오는 거야~ 5makase.com 가면 더 많아",
-    "일본 직구 더 보고 싶으면 → 5makase.com 북마크 해둬!",
-]
-
 class ContentWriter:
     _SAFETY_RULES = """[절대 준수 규칙 — 위반 시 즉시 재생성]
 1. 본문에 URL(http, www 등) 절대 포함 금지
 2. 해시태그(#으로 시작하는 단어) 절대 포함 금지
 3. 이모지는 본문 전체에서 최대 1개만 허용
 4. 본문 마지막 문장은 반드시 독자에게 던지는 자연스러운 질문으로 끝낼 것
-5. 광고·마케팅 문구 절대 금지: '구매', '할인', '이벤트', '지금 구입', '클릭', '링크', '품질 보장', '직수입', '성분 믿을 수 있', '추천드립니다', '강력 추천' 절대 사용 금지
-6. 가격(숫자+원, 숫자+엔, 원/엔 표기) 절대 포함 금지
-7. AI처럼 들리는 문장 금지: '~것 같지 않니?', '~어떠세요?', '~해보세요', '~드립니다' 절대 금지
-8. 실제 사람이 핸드폰으로 빠르게 타이핑한 것처럼 — 완벽한 문장보다 약간 거친 게 더 자연스러움""".strip()
+5. 광고 문구('구매', '할인', '이벤트', '지금 구입', '클릭', '링크') 절대 사용 금지""".strip()
 
-    _POST_EXAMPLES = """[실제 포스트 예시 1 — ddwhat1985 쇼핑 발견체 (10줄+)]
+    # 실제 바이럴 포스트 5개 예시 (시스템 프롬프트 내장)
+    _POST_EXAMPLES = """[실제 포스트 예시 1 — ddwhat1985 쇼핑 발견체]
 오늘 삿포로 놀러왔는데 니시마츠야 있어
 여기가 유아옷 애기 용품 업청 싸게 팔어
 티셔츠 한장에 380엔 정도야
-진짜 업청싸!
-일본 유아용품 물가 이거 실화야?
-한국이랑 비교하면 진짜 반값도 아니고
-그냥 그냥 그냥 싸..
-이 정도면 캐리어 반은 여기서 채워도 되는 거 아님?
-스친이들 여기 아는 사람? ㅎ
+진짜 업청싸! 스친이들 여기 아는 사람?
+우리 별씌 업청사구있음
 
-[실제 포스트 예시 2 — ddwhat1985 흥분체 (12줄+)]
+[실제 포스트 예시 2 — ddwhat1985 흥분체]
 진짜 지난번에 일본가서 먹은 브런치인데
 진짜 흡입하면서 먹은듯
-양도 업청 많고 가격도 말이 돼
-근데 거기서 이 과자 처음 봤거든
-드럭스토어 갔다가 발견한 건데
-처음엔 그냥 예쁘길래 하나 들었는데
-입에 넣는 순간 진짜 멈출 수가 없었어
-결국 5개 사왔는데 비행기 타기 전에 다 먹어버렸음
-지금 생각해도 진짜 맛있었는데..
-스친이들 이거 먹어본 사람 있어?
+스친이들 오늘 아침 뭐먹나
 
-[실제 포스트 예시 3 — dior8524 정보공유체 (12줄+)]
+[실제 포스트 예시 3 — dior8524 정보공유체]
 ★★ 파운드 케이크 좋아하는 치니 있었냥?
 나 부산갔을 때 넘 맛난 파운드케이크를 먹었었는데
-그거 생각나서 일본 직구로 찾아봤거든
 이거 초코맛은 그냥 브라우니라고 보면 되는
 꾸덕 고급진 초코 맛
-그냥 먹어도 맛있는데 커피랑 같이 먹으면 진짜..
-일본 한정 포장이라 선물용으로도 딱이야
 한 번에 여러개 주문해서 냉동보관하기 좋앙!
-해동해서 먹어도 맛 똑같음
-치니덜 이런거 먹어봤냥? 비슷한 거 추천 있어?
 
-[실제 포스트 예시 4 — dior8524 여유체 (10줄+)]
+[실제 포스트 예시 4 — dior8524 여유체]
 오지마..전쟁통이야..
 세일기간 이야..?
-드럭스토어 들어갔다가 진짜 당황함
-사람도 많고 물건도 이미 절반은 나간 것 같은
-그나마 중간에 세일 품목 몇개 걸리긴 함 ㅎㅎ
-이 가격에 이게 된다고..? 싶은 것들 몇개 있어
-근데 또 줄이 넘나 길어서..
-결국 2개만 들고 나왔는데 잘 산 것 같기도 하고
-치니덜 이런거 봤었냥? 뭐 건진 거 있어?
+중간에 세일 품목 몇개 걸리긴 함 ㅎㅎ
+치니덜 이런거 봤었냥?
 
-[실제 포스트 예시 5 — 솔직고백체 (바이럴 173좋아요 구조, 14줄+)]
+[실제 포스트 예시 5 — 솔직고백체 (바이럴 173좋아요 구조)]
 스치나들...솔직히 말할게
-나 요즘 진짜 힘들었거든
-매일 아침 일어나면 피곤하고
-뭔가 계속 부족한 느낌이 있었는데
-그게 뭔지 몰랐어
-근데 이거 써보기 시작하면서
-아 내가 이게 부족했구나 싶더라고
-[상품 특징 1~2줄 자연스럽게]
-진짜 쓰고나서 달라진 게 느껴지니까
-사람들이 왜 이거 계속 사는지 이제 알 것 같아
-혼자만 알고 있기 아까워서 올려봄
+나 요즘 너무 바빠서 제대로 못 챙겼거든
+근데 이거 쓰기 시작하니까 진짜 달라졌어
+[상품 특징 2줄]
 나만 이런 거 몰랐던 거야..?""".strip()
 
     def __init__(self, provider: Optional[BaseAIProvider] = None):
@@ -385,16 +351,6 @@ class ContentWriter:
         return f"""너는 일본 직구 상품을 직접 써본 한국인 Threads 사용자야.
 팔로워들한테 자연스러운 일상 공유처럼 글을 써.
 
-[절대 피해야 할 표현들]
-- '품질도 보장!', '성분도 믿을 수 있', '직수입이라', '추천드립니다' → 절대 금지
-- '~것 같지 않니?', '~어떠세요?' → 너무 어색, 금지
-- '여행선물로도 딱' → 광고 카피 느낌, 금지
-- 가격 언급 → 절대 금지
-- '우리 별씌', '애기', 가족 언급 → 절대 금지
-- '나에게 작은 행복을', '지쳐있는 나', '위로가 됐다' → 감성 과잉, 절대 금지
-- '약국', '현지 약국' → 쓰지 말 것. 드럭스토어(마쓰모토키요시, 코코카라파인, 선드럭 등) 또는 돈키호테로 쓸 것
-대신: 불완전하고, 짧고, 반복도 있고, 진짜 사람 말투로.
-
 {self._POST_EXAMPLES}
 
 ---
@@ -411,17 +367,14 @@ class ContentWriter:
 이번 글엔 {typo_hint} 스타일 오타 포함.
 오타는 억지스럽지 않게, 실제 타이핑 실수처럼 자연스럽게.
 
-[글 길이 규칙 — 반드시 준수]
-최소 10줄 이상 작성할 것. 권장 12~16줄.
-각 줄은 짧은 1~2문장으로 나눌 것 (스크롤 유도).
-한 단락에 몰아쓰지 말고 항상 줄바꿈으로 호흡 나눌 것.
-짧은 글(10줄 미만)은 불합격 — 반드시 길고 자연스럽게.
-
 {self._SAFETY_RULES}
+
+[글 길이 규칙 — 필수]
+본문(content)은 반드시 100자 이내 (공백 포함). 3~5줄 최대. 짧고 임팩트 있게.
 
 출력 형식 (JSON만, 추가 설명 없이):
 {{
-  "content": "Threads 본문 (줄바꿈은 \\n으로)",
+  "content": "Threads 본문 (줄바꿈은 \\n으로, 100자 이내)",
   "first_comment": "첫 댓글 (URL 포함 가능, 자연스럽게 유도)",
   "faq": [
     {{"question": "예상 질문1", "answer": "답변1"}},
@@ -436,7 +389,7 @@ class ContentWriter:
             emotion=packet.emotion,
         )
         features = ", ".join(packet.product_features[:3]) if packet.product_features else "효과 좋음"
-        price_line = ""
+        price_line = f"가격: 약 {packet.price_krw:,}원" if packet.price_krw else ""
 
         return f"""[스토리 컨텍스트]
 여행지: {packet.city}
@@ -462,6 +415,8 @@ class ContentWriter:
 
     def _validate_content(self, content: str) -> list:
         issues = []
+        if len(content) > 120:
+            issues.append(f"글 너무 김: {len(content)}자 (최대 100자)")
         if re.search(r'https?://\S+|www\.\S+', content):
             issues.append("URL 포함")
         if re.search(r'#\w+', content):
@@ -478,12 +433,6 @@ class ContentWriter:
         return issues
 
     def generate(self, packet: StoryPacket, max_attempts: int = 3) -> ContentOutput:
-        last_content = ""
-        last_data = {}
-        last_tone = None
-        last_structure = None
-        last_user = ""
-
         for attempt in range(1, max_attempts + 1):
             structure, tone, hook_tmpl, follower_term = self._pick_variants()
             system = self._build_system_prompt(structure, tone, follower_term)
@@ -495,7 +444,7 @@ class ContentWriter:
             )
 
             try:
-                raw  = self._ai.complete(system, user, max_tokens=1400)
+                raw  = self._ai.complete(system, user, max_tokens=700)
                 data = self._parse_output(raw)
             except Exception as e:
                 logger.error(f"[GEN ERROR] {e}")
@@ -504,13 +453,6 @@ class ContentWriter:
             content = data.get("content", "")
             issues  = self._validate_content(content)
 
-            if content:
-                last_content = content
-                last_data = data
-                last_tone = tone
-                last_structure = structure
-                last_user = user
-
             if issues:
                 logger.warning(f"[RULE VIOLATION] attempt={attempt} | {issues}")
                 continue
@@ -518,27 +460,14 @@ class ContentWriter:
             logger.info(f"[GEN OK] attempt={attempt}")
             return ContentOutput(
                 content           = content,
-                first_comment     = random.choice(FIRST_COMMENT_TEMPLATES),
+                first_comment     = data.get("first_comment", ""),
                 faq_data          = data.get("faq", []),
                 tone_variant      = tone["label"],
                 structure_variant = structure["label"],
                 raw_prompt        = user,
             )
 
-        if last_content:
-            logger.warning("[GEN FALLBACK] 규칙 위반 → URL/해시태그 자동 제거 후 발행")
-            clean = re.sub(r'https?://\S+|www\.\S+', '', last_content)
-            clean = re.sub(r'#\w+', '', clean).strip()
-            return ContentOutput(
-                content           = clean,
-                first_comment     = random.choice(FIRST_COMMENT_TEMPLATES),
-                faq_data          = last_data.get("faq", []),
-                tone_variant      = last_tone["label"] if last_tone else "unknown",
-                structure_variant = last_structure["label"] if last_structure else "unknown",
-                raw_prompt        = last_user,
-            )
-
-        raise RuntimeError(f"콘텐츠 생성 실패: {max_attempts}회 모두 파싱 오류")
+        raise RuntimeError(f"콘텐츠 생성 실패: {max_attempts}회 모두 규칙 위반")
 
 
 if __name__ == "__main__":
@@ -550,8 +479,4 @@ if __name__ == "__main__":
         store_name="삿포로팩토리직구", product_url="", image_url="",
         city="삿포로", situation="니시마츠야 쇼핑", emotion="신남",
         story_theme="삿포로 쇼핑 중 발견",
-        product_features=["홋카이도 한정", "선물용으로 딱", "바삭 + 진한 버터향"],
-        price_krw=12800,
-    )
-    output = writer.generate(packet)
-    print(json.dumps({"content": output.content, "tone": output.tone_variant}, ensure_ascii=False, indent=2))
+        product_featur

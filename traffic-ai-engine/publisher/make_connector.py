@@ -22,11 +22,16 @@ KST = timezone(timedelta(hours=9))
 
 
 def build_target_datetime(target_time: str) -> str:
+    """
+    HH:MM 슬롯 문자열을 Buffer용 ISO 8601 UTC datetime으로 변환.
+    이미 지난 시간이면 내일로 설정.
+    """
     h, m = map(int, target_time.split(":"))
     now_kst = datetime.now(KST)
     scheduled_kst = now_kst.replace(hour=h, minute=m, second=0, microsecond=0)
     if scheduled_kst <= now_kst:
         scheduled_kst += timedelta(days=1)
+    # Buffer API는 UTC ISO 8601 형식 요구
     return scheduled_kst.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 logger = logging.getLogger(__name__)
@@ -49,11 +54,11 @@ class PublishPacket:
     product_url: str
     content: str
     target_time: str
+    image_url_2: str = ""
     faq_data: list = field(default_factory=list)
     review_score: float = 0.0
     story_theme: str = ""
-        image_url_2: str = ""
-generation_attempt: int = 1
+    generation_attempt: int = 1
     pipeline_id: str = field(default_factory=lambda: datetime.utcnow().strftime("%Y%m%d-%H%M%S"))
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
@@ -66,9 +71,9 @@ generation_attempt: int = 1
             "image_url":          self.image_url,
             "image_url_2":        self.image_url_2,
             "product_url":        self.product_url,
-            "content":            self.content,
+            "content":            self.content,  # 링크 제거 — 본문만 전송
             "target_time":        self.target_time,
-            "target_datetime":    build_target_datetime(self.target_time),
+            "target_datetime":    build_target_datetime(self.target_time),  # Buffer 스케줄링용 UTC datetime
             "faq_data":           [asdict(f) for f in self.faq_data],
             "review_score":       self.review_score,
             "story_theme":        self.story_theme,
@@ -78,8 +83,14 @@ generation_attempt: int = 1
 
 
 class ContentSafetyChecker:
-    _URL_RE = re.compile(r'https?://\S+|www\.\S+', re.IGNORECASE)
-    _HASHTAG_RE = re.compile(r'#\w+')
+    _URL_RE      = re.compile(r'https?://\S+|www\.\S+', re.IGNORECASE)
+    _HASHTAG_RE  = re.compile(r'#\w+')
+    _EMOJI_RE    = re.compile(
+        "[\U00010000-\U0010ffff"
+        "\U0001F300-\U0001F9FF"
+        "\u2600-\u27BF]+",
+        flags=re.UNICODE
+    )
 
     def check(self, content: str):
         violations = []
@@ -87,6 +98,9 @@ class ContentSafetyChecker:
             violations.append("URL in content")
         if self._HASHTAG_RE.search(content):
             violations.append("hashtag in content")
+        emojis = self._EMOJI_RE.findall(content)
+        if len(emojis) > 1:
+            violations.append(f"too many emojis: {len(emojis)}")
         return len(violations) == 0, violations
 
 
@@ -97,15 +111,16 @@ class MakeConnector:
         self.webhook_url = os.getenv("MAKE_WEBHOOK_URL", self.DEFAULT_WEBHOOK)
         self.timeout = int(os.getenv("MAKE_TIMEOUT_SEC", "10"))
         self._checker = ContentSafetyChecker()
-        from requests.adapters import HTTPAdapter
-        from urllib3.util.retry import Retry
-        retry = Retry(total=3, backoff_factor=1, status_forcelist=[429,500,502,503,504])
+
+        retry = Retry(total=int(os.getenv("MAKE_MAX_RETRIES", "3")),
+                      backoff_factor=1,
+                      status_forcelist=[429, 500, 502, 503, 504])
         adapter = HTTPAdapter(max_retries=retry)
         self._session = requests.Session()
         self._session.mount("https://", adapter)
         self._session.mount("http://", adapter)
 
-    def _headers(self):
+    def _headers(self) -> dict:
         h = {"Content-Type": "application/json; charset=utf-8"}
         token = os.getenv("MAKE_SECRET_TOKEN", "")
         if token:
@@ -115,21 +130,69 @@ class MakeConnector:
     def send(self, packet: PublishPacket) -> dict:
         is_safe, violations = self._checker.check(packet.content)
         if not is_safe:
-            return {"success": False, "status_code": 0, "response": "Content safety check failed", "violations": violations}
-        payload_bytes = json.dumps(packet.to_webhook_payload(), ensure_ascii=False).encode("utf-8")
+            logger.error(f"[BLOCKED] {violations}")
+            return {"success": False, "status_code": 0,
+                    "response": "Content safety check failed", "violations": violations}
+
+        if packet.target_time not in PUBLISH_SLOTS:
+            logger.warning(f"target_time '{packet.target_time}' not in recommended slots")
+
+        payload_bytes = json.dumps(
+            packet.to_webhook_payload(), ensure_ascii=False
+        ).encode("utf-8")
+
+        logger.info(f"[SEND] id={packet.product_id} | time={packet.target_time}")
         try:
-            resp = self._session.post(self.webhook_url, data=payload_bytes, headers=self._headers(), timeout=self.timeout)
+            resp = self._session.post(
+                self.webhook_url,
+                data=payload_bytes,
+                headers=self._headers(),
+                timeout=self.timeout,
+            )
             resp.raise_for_status()
-            return {"success": True, "status_code": resp.status_code, "response": resp.text, "violations": []}
+            logger.info(f"[OK] HTTP {resp.status_code}")
+            return {"success": True, "status_code": resp.status_code,
+                    "response": resp.text, "violations": []}
+        except requests.HTTPError as e:
+            code = e.response.status_code if e.response else 0
+            logger.error(f"[HTTP {code}] {e}")
+            return {"success": False, "status_code": code,
+                    "response": str(e), "violations": []}
+        except requests.ConnectionError as e:
+            logger.error(f"[CONN ERR] {e}")
+            return {"success": False, "status_code": 0,
+                    "response": str(e), "violations": []}
+        except requests.Timeout:
+            return {"success": False, "status_code": 0,
+                    "response": "Timeout", "violations": []}
         except Exception as e:
-            return {"success": False, "status_code": 0, "response": str(e), "violations": []}
+            logger.exception(f"[UNKNOWN] {e}")
+            return {"success": False, "status_code": 0,
+                    "response": str(e), "violations": []}
 
 
-def pick_target_time(prefer=None):
+def pick_target_time(prefer: Optional[str] = None) -> str:
     if prefer and prefer in PUBLISH_SLOTS:
         return prefer
-    now = datetime.now(KST).strftime("%H:%M")
+    now = datetime.now().strftime("%H:%M")
     for slot in PUBLISH_SLOTS:
         if slot > now:
             return slot
     return PUBLISH_SLOTS[0]
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO,
+                        format="%(asctime)s %(levelname)s %(message)s")
+    connector = MakeConnector()
+    sample = PublishPacket(
+        product_id   = "JP-2024-001",
+        store_name   = "test-store",
+        product_name = "test product",
+        image_url    = "https://example.com/image.jpg",
+        product_url  = "https://example.com/product",
+        content      = "테스트 콘텐츠. 일본 여행 가면 꼭 사봐야 할 아이템 있어?",
+        target_time  = pick_target_time(),
+    )
+    result = connector.send(sample)
+    print(json.dumps(result, ensure_ascii=False, indent=2))

@@ -2,10 +2,11 @@
 analyzer/product_analyzer.py
 TrafficAI Engine 1.0 — Product Analyzer
 
-4개 소스 스토어에서 상품 데이터 수집 → PublishPacket 변환 준비
-소스: sapporofactory, portablejapan, dunkjapan, geminijapan
+5개 소스 스토어에서 상품 데이터 수집 → PublishPacket 변환 준비
+소스: sapporofactory, portablejapan, dunkjapan, geminijapan, 5makase.com
 
 Naver Smartstore: 상품 목록 페이지 파싱 (requests + BeautifulSoup)
+5makase.com: RSS / 상품 목록 페이지 파싱
 """
 
 from __future__ import annotations
@@ -38,19 +39,38 @@ USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0",
 ]
 
-# 네이버 쇼핑 API 검색 키워드 목록
-# GitHub Actions에서 스마트스토어 직접 스크레이핑이 차단(429)되므로
-# 키워드 검색 방식으로 일본직구 상품을 수집합니다.
-SEARCH_KEYWORDS = [
-    {"query": "일본직구 드럭스토어", "category": "드럭스토어", "city": "일본"},
-    {"query": "일본 화장품 직구", "category": "뷰티/스킨케어", "city": "일본"},
-    {"query": "일본 과자 직구", "category": "식품/간식", "city": "일본"},
-    {"query": "일본 직구 생활용품", "category": "생활용품", "city": "일본"},
-    {"query": "삿포로 직구", "category": "드럭스토어", "city": "삿포로"},
-]
-
-# 하위 호환성을 위해 유지 (스크레이퍼 초기화에서 사용 안 함)
-SOURCE_STORES = {}
+SOURCE_STORES = {
+    "sapporofactory": {
+        "name": "삿포로팩토리직구",
+        "url": "https://smartstore.naver.com/sapporofactory",
+        "type": "naver",
+        "city": "삿포로",
+    },
+    "portablejapan": {
+        "name": "포터블재팬직구",
+        "url": "https://smartstore.naver.com/portablejapan",
+        "type": "naver",
+        "city": "일본",
+    },
+    "dunkjapan": {
+        "name": "덩크재팬직구",
+        "url": "https://smartstore.naver.com/dunkjapan",
+        "type": "naver",
+        "city": "일본",
+    },
+    "geminijapan": {
+        "name": "제미니재팬직구",
+        "url": "https://smartstore.naver.com/geminijapan",
+        "type": "naver",
+        "city": "일본",
+    },
+    "5makase": {
+        "name": "5마카세",
+        "url": "https://www.5makase.com",
+        "type": "makase",
+        "city": "일본",
+    },
+}
 
 # ---------------------------------------------------------------------------
 # 데이터 스키마
@@ -72,11 +92,11 @@ class ProductData:
     product_url:  str           # 상품 상세 URL (ManyChat DM 전용)
     category:     str           # 카테고리 (드럭스토어, 식품, 뷰티 등)
     tags:         list = field(default_factory=list)
+    image_url_2:  str = ""     # 보조 이미지 URL (2번째 이미지)
     review_count: int = 0
     review_score: float = 0.0   # 0~100 스케일로 정규화
     city:         str = "일본"
     raw_data:     dict = field(default_factory=dict)
-    image_url_2: str = ""
 
     @property
     def discount_rate(self) -> float:
@@ -154,8 +174,18 @@ class FetchClient:
         상품 페이지에서 og:image 메타태그를 읽어 실제 대표 이미지 URL을 반환.
         실패 시 빈 문자열 반환.
         """
+        images = self.fetch_images(url, n=1)
+        return images[0] if images else ""
+
+    def fetch_images(self, url: str, n: int = 2) -> list:
+        """
+        상품 페이지에서 최대 n개의 이미지 URL을 반환.
+        1순위: og:image / og:image:url 메타태그 (복수 허용)
+        2순위: twitter:image
+        3순위: <img> 태그 (크기 필터 적용)
+        """
         if not url:
-            return ""
+            return []
         try:
             resp = self._session.get(
                 url,
@@ -165,17 +195,44 @@ class FetchClient:
             )
             resp.raise_for_status()
             soup = BeautifulSoup(resp.text, "html.parser")
-            # 1순위: og:image
-            og = soup.find("meta", property="og:image")
-            if og and og.get("content"):
-                return og["content"].strip()
-            # 2순위: twitter:image
+            found = []
+
+            # og:image (여러 개 있을 수 있음)
+            for tag in soup.find_all("meta", property="og:image"):
+                val = tag.get("content", "").strip()
+                if val and val not in found:
+                    found.append(val)
+                if len(found) >= n:
+                    return found
+
+            # twitter:image
             tw = soup.find("meta", attrs={"name": "twitter:image"})
-            if tw and tw.get("content"):
-                return tw["content"].strip()
+            if tw:
+                val = tw.get("content", "").strip()
+                if val and val not in found:
+                    found.append(val)
+            if len(found) >= n:
+                return found
+
+            # <img> 태그 폴백 (썸네일 제외, 충분히 큰 이미지만)
+            for img in soup.find_all("img"):
+                src = img.get("src") or img.get("data-src") or ""
+                if not src or src.startswith("data:"):
+                    continue
+                if not src.startswith("http"):
+                    src = urljoin(url, src)
+                w = int(img.get("width", 0) or 0)
+                h = int(img.get("height", 0) or 0)
+                if (w and w < 100) or (h and h < 100):
+                    continue
+                if src not in found:
+                    found.append(src)
+                if len(found) >= n:
+                    return found
+
         except Exception as e:
-            logger.debug(f"[OG:IMAGE] {url}: {e}")
-        return ""
+            logger.debug(f"[FETCH_IMAGES] {url}: {e}")
+        return found
 
 
 # ---------------------------------------------------------------------------
@@ -233,7 +290,7 @@ class NaverSmartStoreScraper(BaseStoreScraper):
             return []
 
         params = {
-            "query":   self.store_key,   # 영문 스토어 ID로 검색 (예: sapporofactory)
+            "query":   self.store_name,
             "display": min(limit, 100),
             "sort":    "date",           # 최신순
         }
@@ -250,7 +307,6 @@ class NaverSmartStoreScraper(BaseStoreScraper):
             )
             resp.raise_for_status()
             items = resp.json().get("items", [])
-            logger.info(f"[NAVER API] {self.store_key}: 원본 {len(items)}개 수신")
         except Exception as e:
             logger.warning(f"[NAVER API] {self.store_key}: {e}")
             return []
@@ -258,7 +314,7 @@ class NaverSmartStoreScraper(BaseStoreScraper):
         products = []
         for item in items:
             mall = item.get("mallName", "")
-            if self.store_key not in item.get("link", "").lower() and self.store_name not in mall:
+            if self.store_name not in mall and self.store_key not in item.get("link", "").lower():
                 continue
 
             price   = int(re.sub(r"\D", "", item.get("lprice", "0")) or 0)
@@ -454,12 +510,130 @@ class NaverSmartStoreScraper(BaseStoreScraper):
 
 
 # ---------------------------------------------------------------------------
+# 5makase.com 스크레이퍼
+# ---------------------------------------------------------------------------
+
+class MakaseScraper(BaseStoreScraper):
+    """
+    https://www.5makase.com/ 상품 파싱.
+    일본 큐레이션 상품 사이트. 카테고리별 HTML 파싱 사용.
+    """
+
+    CATEGORY_PATHS = [
+        "/category/드럭스토어",
+        "/category/food",
+        "/category/beauty",
+        "/category/daily",
+        "",    # 메인 (최신 상품)
+    ]
+
+    def fetch_products(self, limit: int = 20) -> list:
+        all_products = []
+
+        for path in self.CATEGORY_PATHS:
+            if len(all_products) >= limit:
+                break
+            url  = self.base_url + path
+            soup = self.client.get(url)
+            if not soup:
+                continue
+
+            batch = self._parse_page(soup)
+            existing_ids = {p.product_id for p in all_products}
+            for p in batch:
+                if p.product_id not in existing_ids:
+                    all_products.append(p)
+                    existing_ids.add(p.product_id)
+
+        logger.info(f"[5makase] {len(all_products)}개 수집")
+        return all_products[:limit]
+
+    def _parse_page(self, soup: BeautifulSoup) -> list:
+        products = []
+
+        card_selectors = [
+            "article.product",
+            "div.product-card",
+            "li.product",
+            "div[class*='product']",
+            "article",
+        ]
+
+        cards = []
+        for sel in card_selectors:
+            cards = soup.select(sel)
+            if len(cards) >= 2:
+                break
+
+        for card in cards:
+            try:
+                name_el = card.select_one("h2, h3, h4, .product-title, .name, [class*='title']")
+                name = name_el.get_text(strip=True) if name_el else ""
+                if not name or len(name) < 3:
+                    continue
+
+                img_el = card.select_one("img")
+                img_url = ""
+                if img_el:
+                    img_url = (
+                        img_el.get("data-src")
+                        or img_el.get("src")
+                        or ""
+                    )
+                    if img_url and not img_url.startswith("http"):
+                        img_url = urljoin(self.base_url, img_url)
+
+                a_el = card.select_one("a[href]")
+                href = a_el.get("href", "") if a_el else ""
+                if href and not href.startswith("http"):
+                    href = urljoin(self.base_url, href)
+
+                price_el = card.select_one("[class*='price'], .cost, .amount")
+                price_text = price_el.get_text(strip=True) if price_el else "0"
+                price = int(re.sub(r"\D", "", price_text) or 0)
+
+                category = self._guess_category(name, href)
+                raw_pid = href.split("/")[-1] or name[:12]
+
+                products.append(ProductData(
+                    product_id   = self._make_product_id(raw_pid),
+                    store_key    = self.store_key,
+                    store_name   = self.store_name,
+                    product_name = name,
+                    price        = price,
+                    original_price = price,
+                    image_url    = img_url,
+                    product_url  = href or self.base_url,
+                    category     = category,
+                    city         = "일본",
+                    review_score = 75.0,
+                ))
+            except Exception as e:
+                logger.debug(f"[5MAKASE CARD] {e}")
+
+        return products
+
+    @staticmethod
+    def _guess_category(name: str, url: str) -> str:
+        text = (name + " " + url).lower()
+        if any(k in text for k in ("마스크", "클렌", "선크림", "스킨", "로션", "세럼", "크림", "뷰티")):
+            return "뷰티/스킨케어"
+        if any(k in text for k in ("비타민", "약", "드럭", "의약", "supplement")):
+            return "드럭스토어"
+        if any(k in text for k in ("과자", "초콜릿", "구미", "스낵", "食品", "food", "식품", "음료")):
+            return "식품/간식"
+        if any(k in text for k in ("샴푸", "컨디셔너", "헤어", "hair")):
+            return "헤어케어"
+        return "일반상품"
+
+
+# ---------------------------------------------------------------------------
 # 오케스트레이터
 # ---------------------------------------------------------------------------
 
 class ProductAnalyzer:
     """
-    4개 소스 스토어에서 상품 데이터를 수집하고 점수화.
+    5개 소스 스토어에서 상품 데이터를 수집하고 점수화.
 
     환경변수:
         NAVER_CLIENT_ID     : Naver 오픈 API 클라이언트 ID (선택)
@@ -477,91 +651,28 @@ class ProductAnalyzer:
         self._scrapers = self._init_scrapers()
 
     def _init_scrapers(self) -> dict:
-        return {}  # 키워드 검색 방식에서는 스크레이퍼 불필요
+        scrapers = {}
+        for key, meta in SOURCE_STORES.items():
+            if meta["type"] == "naver":
+                scrapers[key] = NaverSmartStoreScraper(key, self._client)
+            elif meta["type"] == "makase":
+                scrapers[key] = MakaseScraper(key, self._client)
+        return scrapers
 
     def fetch_all(self, per_store: int = 20) -> list:
-        """키워드별 네이버 쇼핑 API로 상품 수집"""
+        """모든 스토어에서 상품 수집"""
         all_products = []
-        seen_ids = set()
-
-        naver_id = os.getenv("NAVER_CLIENT_ID", "")
-        naver_secret = os.getenv("NAVER_CLIENT_SECRET", "")
-
-        if not (naver_id and naver_secret):
-            logger.error("[ANALYZER] NAVER_CLIENT_ID/SECRET 미설정. 수집 불가.")
-            return []
-
-        for kw in SEARCH_KEYWORDS:
+        for key, scraper in self._scrapers.items():
             try:
-                logger.info(f"[ANALYZER] 키워드 검색: {kw['query']}")
-                batch = self._fetch_by_keyword(
-                    query=kw["query"],
-                    category=kw["category"],
-                    city=kw["city"],
-                    limit=per_store,
-                    naver_id=naver_id,
-                    naver_secret=naver_secret,
-                    store_filter=kw.get("store_filter", ""),
-                )
-                new = [p for p in batch if p.product_id not in seen_ids]
-                seen_ids.update(p.product_id for p in new)
-                all_products.extend(new)
-                logger.info(f"[ANALYZER] '{kw['query']}' → {len(new)}개")
+                logger.info(f"[ANALYZER] {key} 수집 시작")
+                batch = scraper.fetch_products(per_store)
+                all_products.extend(batch)
+                logger.info(f"[ANALYZER] {key} 완료: {len(batch)}개")
             except Exception as e:
-                logger.error(f"[ANALYZER] '{kw['query']}' 오류: {e}")
-
+                logger.error(f"[ANALYZER] {key} 오류: {e}")
         logger.info(f"[ANALYZER] 총 {len(all_products)}개 수집")
         self._enrich_images(all_products)
         return all_products
-
-    def _fetch_by_keyword(self, query: str, category: str, city: str,
-                          limit: int, naver_id: str, naver_secret: str,
-                          store_filter: str = "") -> list:
-        """네이버 쇼핑 API로 키워드 검색"""
-        import hashlib as _hashlib
-        NAVER_API_URL = "https://openapi.naver.com/v1/search/shop.json"
-        params = {"query": query, "display": min(limit, 100), "sort": "date"}
-        headers = {"X-Naver-Client-Id": naver_id, "X-Naver-Client-Secret": naver_secret}
-        try:
-            resp = requests.get(NAVER_API_URL, params=params, headers=headers, timeout=10)
-            resp.raise_for_status()
-            items = resp.json().get("items", [])
-            logger.info(f"[NAVER API] '{query}': {len(items)}개 수신")
-        except Exception as e:
-            logger.warning(f"[NAVER API] '{query}': {e}")
-            return []
-
-        products = []
-        for item in items:
-            # 지정 스토어 필터
-            if store_filter:
-                mall = item.get("mallName", "").lower()
-                link = item.get("link", "").lower()
-                if store_filter not in mall and store_filter not in link:
-                    continue
-            name_clean = re.sub(r"<[^>]+>", "", item.get("title", "")).strip()
-            if not name_clean:
-                continue
-            price = int(re.sub(r"\D", "", item.get("lprice", "0")) or 0)
-            h_price = int(re.sub(r"\D", "", item.get("hprice", "0")) or 0)
-            raw_id = item.get("productId") or item.get("link", name_clean)[:20]
-            pid = "KW-" + _hashlib.md5(f"{query}:{raw_id}".encode()).hexdigest()[:8]
-            products.append(ProductData(
-                product_id=pid,
-                store_key="naver_search",
-                store_name=item.get("mallName", "네이버쇼핑"),
-                product_name=name_clean,
-                price=price,
-                original_price=h_price if h_price > price else price,
-                image_url=item.get("image", ""),
-                product_url=item.get("link", ""),
-                category=category,
-                tags=[item.get("brand", "")],
-                review_score=75.0,
-                city=city,
-                raw_data=item,
-            ))
-        return products
 
     def fetch_store(self, store_key: str, limit: int = 20) -> list:
         """특정 스토어만 수집"""
@@ -573,52 +684,28 @@ class ProductAnalyzer:
 
     def _enrich_images(self, products: list) -> None:
         """
-        image_url이 완전히 비어 있는 경우에만
-        상품 페이지의 og:image 메타태그로 교체.
-        (untrusted domain URL도 그대로 사용 — 스토어 배너 오염 방지)
-        Pexels에서 두 번째 이미지도 가져온다.
+        image_url이 없으면 og:image로 채우고,
+        항상 상품 페이지에서 image_url_2(보조 이미지)도 수집 시도.
         """
-        pexels_key = os.getenv("PEXELS_API_KEY", "")
         for p in products:
-            needs_refresh = not p.image_url
-            if needs_refresh and p.product_url:
-                logger.debug(f"[OG:IMAGE] {p.product_name[:30]} → og:image 조회 중")
-                og_url = self._client.fetch_og_image(p.product_url)
-                if og_url:
-                    logger.info(f"[OG:IMAGE] ✓ {p.product_name[:30]}")
-                    p.image_url = og_url
-                else:
-                    logger.warning(f"[OG:IMAGE] ✗ {p.product_name[:30]} — og:image 없음")
-            if pexels_key and not p.image_url_2:
-                p.image_url_2 = self._fetch_pexels_image(p, pexels_key)
+            if not p.product_url:
+                continue
+            needs_primary = not p.image_url
+            needs_secondary = not p.image_url_2
 
-    def _fetch_pexels_image(self, product, api_key: str) -> str:
-        keywords = {
-            "뷰티/스킨케어": "japanese beauty skincare shop",
-            "드럭스토어": "japanese drugstore shopping",
-            "식품/간식": "japanese snacks convenience store",
-            "헤어케어": "japanese haircare products",
-        }
-        query = keywords.get(product.category, "japan shopping products")
-        name_words = product.product_name.split()[:2]
-        if name_words:
-            query = " ".join(name_words) + " japan"
-        try:
-            resp = requests.get(
-                "https://api.pexels.com/v1/search",
-                headers={"Authorization": api_key},
-                params={"query": query, "per_page": 5, "orientation": "square"},
-                timeout=10,
-            )
-            resp.raise_for_status()
-            photos = resp.json().get("photos", [])
-            for photo in photos:
-                url = photo["src"]["medium"]
-                if url != product.image_url:
-                    return url
-        except Exception as e:
-            logger.warning(f"[PEXELS] {e}")
-        return ""
+            if needs_primary or needs_secondary:
+                logger.debug(f"[IMAGES] {p.product_name[:30]} → 이미지 조회 중")
+                imgs = self._client.fetch_images(p.product_url, n=2)
+                if imgs:
+                    if needs_primary:
+                        p.image_url = imgs[0]
+                        logger.info(f"[IMAGE1] ✓ {p.product_name[:30]}")
+                    if len(imgs) >= 2 and needs_secondary:
+                        p.image_url_2 = imgs[1]
+                        logger.info(f"[IMAGE2] ✓ {p.product_name[:30]}")
+                else:
+                    if needs_primary:
+                        logger.warning(f"[IMAGE1] ✗ {p.product_name[:30]} — 이미지 없음")
 
     def pick_best(
         self,
@@ -633,59 +720,16 @@ class ProductAnalyzer:
         if exclude_ids is None:
             exclude_ids = set()
 
-        filtered = []
-        for p in products:
-            if p.product_id in exclude_ids:
-                continue
-            if not p.product_name:
-                continue
-            # 이미지 없으면 제외하지 말고 플레이스홀더 유지 (og:image 실패해도 발행 가능)
-            if not (self.min_price <= p.price <= self.max_price):
-                logger.debug(f"[pick_best] 가격 필터 제외: {p.product_name[:20]} price={p.price}")
-                continue
-            if p.review_score < self.min_score:
-                logger.debug(f"[pick_best] 점수 필터 제외: {p.product_name[:20]} score={p.review_score}")
-                continue
-            filtered.append(p)
-        logger.info(f"[pick_best] {len(products)}개 중 {len(filtered)}개 통과 (image필터 해제)")
+        filtered = [
+            p for p in products
+            if p.product_id not in exclude_ids
+            and p.product_name
+            and p.image_url
+            and self.min_price <= p.price <= self.max_price
+            and p.review_score >= self.min_score
+        ]
 
-        PRIORITY_STORES = {"sapporofactory", "portablejapan", "dunkjapan", "geminijapan"}
-
-        PRIORITY_STORES = {"sapporofactory", "portablejapan", "dunkjapan", "geminijapan"}
-
-        def _score(p):
-            from datetime import datetime as _dt
-            base = p.review_score
-            # 지정 스토어 우선 (URL 또는 스토어명으로 판별)
-            url_lower = p.product_url.lower()
-            store_lower = p.store_name.lower()
-            if any(s in url_lower or s in store_lower for s in PRIORITY_STORES):
-                base += 60.0
-            # 지정 스토어 우선
-            store_lower = p.store_name.lower()
-            if any(s in store_lower for s in PRIORITY_STORES):
-                base += 60.0
-            hour = _dt.now().hour
-            # 오후 3시 슬롯: 식품/간식 우선
-            if 14 <= hour <= 16:
-                cat = p.category.lower()
-                name = p.product_name.lower()
-                if any(k in cat for k in ("식품", "간식", "food", "스낵", "과자")):
-                    base += 30.0
-                if any(k in name for k in ("과자", "초콜릿", "구미", "스낵", "캔디", "쿠키", "젤리", "킷캣", "포키", "칩")):
-                    base += 25.0
-            # 의류/패션 스토어 우선 (portablejapan)
-            if p.store_key == "portablejapan":
-                base += 25.0
-            # 의류 카테고리 키워드 감지
-            cat = p.category.lower()
-            name = p.product_name.lower()
-            if any(k in cat for k in ("의류", "패션", "clothing", "apparel", "wear", "shirt", "pants")):
-                base += 20.0
-            if any(k in name for k in ("티셔츠", "바지", "원피스", "자켓", "코트", "셔츠", "블라우스", "가디건", "니트", "후드", "점퍼")):
-                base += 15.0
-            return base
-        filtered.sort(key=_score, reverse=True)
+        filtered.sort(key=lambda p: p.review_score, reverse=True)
 
         # 스토어별 최대 1개씩 우선 선택 (다양성)
         selected = []
@@ -698,14 +742,21 @@ class ProductAnalyzer:
                 selected.append(p)
                 used_stores.add(p.store_key)
 
-        # 다양성 부족하면 점수순으로 채우기 (같은 store_key면 카테고리로 다양성)
+        # 부족하면 점수순으로 채우기
         for p in filtered:
             if len(selected) >= n:
                 break
             if p not in selected:
                 selected.append(p)
 
-        logger.info(f"[pick_best] 선별 완료: {len(selected)}개")
         return selected[:n]
 
- 
+    def score_product(self, product) -> float:
+        """
+        상품 ContentScore 계산 (0~100).
+        리뷰 점수 + 할인율 + 이름 길이 + 이미지 유무 반영.
+        """
+        score = product.review_score or 70.0
+
+        # 할인율 보너스 (최대 +15)
+        score += min(product.discount_rate / 2, 1
