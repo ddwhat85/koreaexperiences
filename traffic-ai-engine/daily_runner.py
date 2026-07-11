@@ -285,6 +285,20 @@ def run_single(
 # 일일 실행 메인
 # ---------------------------------------------------------------------------
 
+
+# ---------------------------------------------------------------------------
+# 상품명 블랙리스트 — 이 키워드가 포함된 상품은 자동 발행에서 제외
+# ---------------------------------------------------------------------------
+NAME_BLACKLIST: list[str] = [
+    "kitkat", "킷캣", "キットカット", "kit kat", "kit-kat",
+]
+
+
+def is_blacklisted(product_name: str) -> bool:
+    """상품명에 블랙리스트 키워드가 포함되어 있으면 True."""
+    nl = product_name.lower()
+    return any(kw in nl for kw in NAME_BLACKLIST)
+
 def run_daily(
     slots: list[str] | None = None,
     store_filter: str | None = None,
@@ -316,6 +330,12 @@ def run_daily(
         products = analyzer.fetch_store(store_filter, limit=per_store_fetch)
     else:
         products = analyzer.fetch_all(per_store=per_store_fetch)
+
+    # 블랙리스트 필터링
+    products = [p for p in products if not is_blacklisted(p.product_name)]
+    if not products:
+        logger.warning("블랙리스트 필터 후 상품 없음. 종료.")
+        return
 
     if not products:
         logger.error("수집된 상품 없음. 종료.")
