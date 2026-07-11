@@ -25,4 +25,12 @@ jobs:
           SFTP_USER: ${{ secrets.KE_SFTP_USER }}
           REMOTE_PATH: ${{ secrets.KE_REMOTE_PATH }}
         run: |
-          printf 'put ./index.html %sindex.html\n' "$REMOTE_PATH" | sftp -b - -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -P 22 "$SFTP_USER@$SFTP_HOST"
+          {
+            printf 'put ./index.html %sindex.html\n' "$REMOTE_PATH"
+            printf 'put ./robots.txt %srobots.txt\n' "$REMOTE_PATH"
+            printf 'put ./sitemap.xml %ssitemap.xml\n' "$REMOTE_PATH"
+            printf 'put ./pricing.html %spricing.html\n' "$REMOTE_PATH"
+            printf 'put ./terms.html %sterms.html\n' "$REMOTE_PATH"
+            printf 'put ./privacy.html %sprivacy.html\n' "$REMOTE_PATH"
+            printf 'put ./refund.html %srefund.html\n' "$REMOTE_PATH"
+          } | sftp -b - -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -P 22 "$SFTP_USER@$SFTP_HOST"
