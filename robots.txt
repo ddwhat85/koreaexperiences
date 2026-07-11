@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://koreaexperiences.com/sitemap.php
+Sitemap: https://www.koreaexperiences.com/sitemap.xml
